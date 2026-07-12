@@ -1,0 +1,1 @@
+# Stage backend configuration placeholder
