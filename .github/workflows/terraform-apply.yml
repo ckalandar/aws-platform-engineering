@@ -2,12 +2,6 @@ name: Terraform Apply
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'infrastructure/**'
-      - '.github/workflows/terraform-apply.yml'
 
 permissions:
   id-token: write
