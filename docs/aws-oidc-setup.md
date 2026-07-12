@@ -2,20 +2,37 @@
 
 This repository uses GitHub OIDC to authenticate to AWS without storing long-lived secrets.
 
-## Required GitHub repository variables
-
-Set these in GitHub repository settings -> Secrets and variables -> Actions -> Variables:
-
-- AWS_ROLE_TO_ASSUME: ARN of the IAM role that GitHub Actions will assume
-- AWS_REGION: AWS region, for example us-east-1
-- PROJECT_NAME: project name used for Terraform resource naming, for example platform
-
-## AWS setup
-
 1. Create an IAM OIDC identity provider for GitHub Actions.
+
+AWS Console
+
+IAM └── Identity Providers └── Add Provider
+
+Provider Type
+
+OpenID Connect
+
+Provider URL
+
+https://token.actions.githubusercontent.com
+
+Audience
+
+sts.amazonaws.com
+
+After creation you'll have:
+
+arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com
+
 2. Create an IAM role that trusts the GitHub repository and branch.
-3. Attach the required permissions for Terraform bootstrap resources.
-4. Add the role ARN and region as GitHub Actions variables.
+
+Name:
+
+GitHubActionsCloudFormationRole
+
+Trust Policy:
+
+Replace <ACCOUNT_ID> with yours.
 
 ## Example trust policy
 
@@ -41,3 +58,21 @@ Set these in GitHub repository settings -> Secrets and variables -> Actions -> V
   ]
 }
 ```
+
+3. Attach the required permissions for Terraform bootstrap resources.
+
+For learning:
+
+Attach:
+
+AdministratorAccess
+
+I wouldn't do this in production, but for a personal lab it's the fastest way to get moving.
+
+## Required GitHub repository variables
+
+Set these in GitHub repository settings -> Secrets and variables -> Actions -> Variables:
+- AWS_ROLE_TO_ASSUME: ARN of the IAM role that GitHub Actions will assume ex: Value: 
+arn:aws:iam::<ACCOUNT_ID>:role/GitHubActionsCloudFormationRole
+- AWS_REGION: AWS region, for example us-east-1
+- PROJECT_NAME: project name used for Terraform resource naming, for example platform
