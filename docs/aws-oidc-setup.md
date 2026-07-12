@@ -28,7 +28,7 @@ arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com
 
 Name:
 
-GitHubActionsCloudFormationRole
+GitHubActionsPlatformEnggAdminRole
 
 Trust Policy:
 
