@@ -7,7 +7,13 @@ variable "aws_region" {
 variable "project_name" {
   description = "Project name used for bootstrap resource naming"
   type        = string
-  default     = "platform"
+  default     = "kk-platform"
+}
+
+variable "aws_profile" {
+  description = "Optional AWS CLI profile name to use for local authentication"
+  type        = string
+  default     = null
 }
 
 variable "state_bucket_name" {
