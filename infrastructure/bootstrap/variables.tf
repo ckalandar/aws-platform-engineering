@@ -10,12 +10,6 @@ variable "project_name" {
   default     = "kk-platform"
 }
 
-variable "aws_profile" {
-  description = "Optional AWS CLI profile name to use for local authentication"
-  type        = string
-  default     = null
-}
-
 variable "state_bucket_name" {
   description = "Optional override for the Terraform state bucket name"
   type        = string
