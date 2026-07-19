@@ -1,1 +1,9 @@
-infrastructure/bootstrap/.terraform/
+# Ignore Terraform working directories and plugin caches
+**/.terraform/
+
+# Ignore local Terraform state files
+*.tfstate
+*.tfstate.backup
+
+# Keep lockfiles committed, but ignore temp state directories
+!.terraform.lock.hcl
