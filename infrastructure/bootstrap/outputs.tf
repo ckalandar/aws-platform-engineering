@@ -9,5 +9,5 @@ output "dynamodb_table_name" {
 }
 
 output "github_actions_role_arn" {
-  value = aws_iam_role.github_actions.arn
+  value = var.manage_oidc ? aws_iam_role.github_actions[0].arn : null
 }

@@ -11,7 +11,7 @@ Use resource names in the form:
 
 ## Repository layout
 
-- infrastructure/modules: reusable resource modules such as vpc, security-groups, ecr, eks, rds, and monitoring
+- infrastructure/modules: reusable resource modules such as vpc, security_groups, ecr, eks, rds, and monitoring
 - infrastructure/environments: environment entrypoints for dev, stage, and prod
 - applications: service directories such as user-service, order-service, and payment-service
 - gitops: GitOps base and environment overlays

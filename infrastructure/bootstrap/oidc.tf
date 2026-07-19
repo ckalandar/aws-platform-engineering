@@ -1,5 +1,6 @@
 resource "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
+  count = var.manage_oidc ? 1 : 0
+  url   = "https://token.actions.githubusercontent.com"
 
   client_id_list = [
     "sts.amazonaws.com"
@@ -11,16 +12,14 @@ resource "aws_iam_openid_connect_provider" "github" {
 }
 
 data "aws_iam_policy_document" "github_assume_role" {
+  count = var.manage_oidc ? 1 : 0
   statement {
-
-    actions = [
-      "sts:AssumeRoleWithWebIdentity"
-    ]
+    actions = ["sts:AssumeRoleWithWebIdentity"]
 
     principals {
       type = "Federated"
       identifiers = [
-        aws_iam_openid_connect_provider.github.arn
+        aws_iam_openid_connect_provider.github[0].arn
       ]
     }
 
@@ -35,7 +34,6 @@ data "aws_iam_policy_document" "github_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-
       values = [
         "repo:ckalandar/aws-platform-engineering:*"
       ]
@@ -44,13 +42,15 @@ data "aws_iam_policy_document" "github_assume_role" {
 }
 
 resource "aws_iam_role" "github_actions" {
-  name = "platform-github-actions-role"
+  count = var.manage_oidc ? 1 : 0
+  name  = "platform-github-actions-role"
 
-  assume_role_policy = data.aws_iam_policy_document.github_assume_role.json
+  assume_role_policy = data.aws_iam_policy_document.github_assume_role[0].json
 }
 
 resource "aws_iam_role_policy_attachment" "admin" {
-  role       = aws_iam_role.github_actions.name
+  count      = var.manage_oidc ? 1 : 0
+  role       = aws_iam_role.github_actions[0].name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
 
