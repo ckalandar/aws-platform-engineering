@@ -27,3 +27,7 @@ output "oidc_issuer_url" {
   description = "OIDC Issuer URL"
   value       = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
+
+output "alb_controller_role_arn" {
+  value = aws_iam_role.alb_controller.arn
+}
