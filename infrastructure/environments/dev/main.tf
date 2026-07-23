@@ -1,16 +1,3 @@
-terraform {
-
-  required_providers {
-    aws = {
-      source = "hashicorp/aws"
-    }
-  }
-}
-
-provider "aws" {
-  region = "us-east-1"
-}
-
 module "vpc" {
   source = "../../modules/vpc"
 
@@ -35,3 +22,17 @@ module "security_groups" {
   vpc_id = module.vpc.vpc_id
 }
 
+## EKS Cluster
+
+module "eks" {
+
+  source = "../../modules/eks"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  private_app_subnet_ids = module.vpc.private_app_subnet_ids
+
+  eks_node_sg_id    = module.security_groups.eks_node_sg_id
+  eks_cluster_sg_id = module.security_groups.eks_cluster_sg_id
+}

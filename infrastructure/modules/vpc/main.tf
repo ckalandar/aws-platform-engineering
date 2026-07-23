@@ -36,12 +36,16 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = merge(
-    local.common_tags,
-    {
-      Name = "${var.project_name}-${var.environment}-public-${count.index + 1}"
-      Type = "public"
-    }
-  )
+  local.common_tags,
+  {
+    Name = "${var.project_name}-${var.environment}-public-${count.index + 1}"
+    Type = "public"
+
+    "kubernetes.io/role/elb" = "1"
+
+    "kubernetes.io/cluster/${var.project_name}-${var.environment}" = "shared"
+  }
+)
 }
 
 ### Private App Subnets
@@ -57,12 +61,16 @@ resource "aws_subnet" "private_app" {
   availability_zone = var.availability_zones[count.index]
 
   tags = merge(
-    local.common_tags,
-    {
-      Name = "${var.project_name}-${var.environment}-app-${count.index + 1}"
-      Type = "private-app"
-    }
-  )
+  local.common_tags,
+  {
+    Name = "${var.project_name}-${var.environment}-app-${count.index + 1}"
+    Type = "private-app"
+
+    "kubernetes.io/role/internal-elb" = "1"
+
+    "kubernetes.io/cluster/${var.project_name}-${var.environment}" = "shared"
+  }
+)
 }
 
 ### Private DB Subnets
