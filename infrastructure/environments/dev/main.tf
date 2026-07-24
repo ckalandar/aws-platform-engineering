@@ -36,3 +36,14 @@ module "eks" {
   eks_node_sg_id    = module.security_groups.eks_node_sg_id
   eks_cluster_sg_id = module.security_groups.eks_cluster_sg_id
 }
+
+module "platform" {
+
+  source = "../../modules/platform"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_issuer_url   = module.eks.oidc_issuer_url
+}
