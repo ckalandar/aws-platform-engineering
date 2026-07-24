@@ -1,0 +1,11 @@
+clusterName: kk-platform-stage
+
+region: us-east-1
+
+vpcId: vpc-xxxxxxxx
+
+serviceAccount:
+  create: false
+  name: aws-load-balancer-controller
+
+replicaCount: 2

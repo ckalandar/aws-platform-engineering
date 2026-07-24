@@ -1,0 +1,11 @@
+clusterName: kk-platform-prod
+
+region: us-east-1
+
+vpcId: vpc-yyyyyyyy
+
+serviceAccount:
+  create: false
+  name: aws-load-balancer-controller
+
+replicaCount: 2
