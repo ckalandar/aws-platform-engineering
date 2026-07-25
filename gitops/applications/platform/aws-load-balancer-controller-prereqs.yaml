@@ -9,7 +9,7 @@ metadata:
 
 spec:
 
-  project: platform
+  project: default
 
   source:
     repoURL: https://github.com/ckalandar/aws-platform-engineering.git

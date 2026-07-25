@@ -11,3 +11,7 @@ output "dynamodb_table_name" {
 output "github_actions_role_arn" {
   value = var.manage_oidc ? aws_iam_role.github_actions[0].arn : null
 }
+
+output "terraform_state_bucket" {
+  value = aws_s3_bucket.terraform_state.bucket
+}

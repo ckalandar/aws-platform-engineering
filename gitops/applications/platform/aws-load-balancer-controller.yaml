@@ -9,7 +9,7 @@ metadata:
 
 spec:
 
-  project: platform
+  project: default
 
   destination:
     namespace: kube-system
@@ -23,17 +23,16 @@ spec:
 
       helm:
         valueFiles:
-          - $values/gitops/manifests/aws-load-balancer-controller/dev-values.yaml
+          - $values/gitops/values/aws-load-balancer-controller/dev.yaml
 
     - repoURL: https://github.com/ckalandar/aws-platform-engineering.git
       targetRevision: main
       ref: values
 
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
 
-  automated:
-    prune: true
-    selfHeal: true
-
-  syncOptions:
-    - CreateNamespace=true
+    syncOptions:
+      - CreateNamespace=true

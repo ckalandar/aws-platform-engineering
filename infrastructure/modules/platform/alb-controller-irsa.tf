@@ -60,18 +60,16 @@ resource "aws_iam_policy" "alb_controller" {
 
   name = "${var.project_name}-${var.environment}-alb-controller-policy"
 
-  policy = jsonencode(
-  jsondecode(
-    file("${path.module}/policies/aws-load-balancer-controller.json")
+  policy = file(
+  "${path.module}/policies/aws-load-balancer-controller.json"
   )
-)
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "${var.project_name}-${var.environment}-alb-controller-policy"
-    }
-  )
+  #tags = merge(
+  #  local.common_tags,
+  #  {
+  #    Name = "${var.project_name}-${var.environment}-alb-controller-policy"
+  #  }
+  #)
 }
 
 resource "aws_iam_role_policy_attachment" "alb_controller" {

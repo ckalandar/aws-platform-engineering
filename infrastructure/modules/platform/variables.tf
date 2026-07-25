@@ -13,3 +13,15 @@ variable "oidc_provider_arn" {
 variable "oidc_issuer_url" {
   type = string
 }
+
+variable "cluster_name" {
+  type = string
+}
+
+variable "vpc_id" {
+  type = string
+}
+
+variable "aws_region" {
+  type = string
+}

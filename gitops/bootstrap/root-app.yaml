@@ -11,7 +11,7 @@ spec:
 
   source:
     repoURL: https://github.com/ckalandar/aws-platform-engineering.git
-    targetRevision: HEAD
+    targetRevision: main
     path: gitops/applications/platform
 
   destination:
