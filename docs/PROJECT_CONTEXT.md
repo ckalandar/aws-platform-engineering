@@ -3280,3 +3280,85 @@ terraform init -backend-config=backend-dev.hcl -reconfigure.
 terraform apply.
 
 That should get you back to a working EKS + ArgoCD environment much faster than the last cycle.
+
+ Error: Reference to undeclared resource
+│ 
+│   on main.tf line 10, in resource "aws_s3_bucket" "terraform_state":
+│   10:   bucket = "kk-platform-terraform-state-${data.aws_caller_identity.current.account_id}"
+│ 
+│ A data resource "aws_caller_identity" "current" has not been declared in the root module
+
+That's expected.
+
+You added:
+
+bucket = "kk-platform-terraform-state-${data.aws_caller_identity.current.account_id}"
+
+but Terraform doesn't know what data.aws_caller_identity.current is because you haven't declared it.
+
+Add this near the top of your bootstrap configuration:
+
+data "aws_caller_identity" "current" {}
+
+For example:
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_s3_bucket" "terraform_state" {
+
+  bucket = "kk-platform-terraform-state-${data.aws_caller_identity.current.account_id}"
+
+  tags = {
+    Name        = "kk-platform-terraform-state"
+    Environment = "bootstrap"
+    ManagedBy   = "terraform"
+  }
+}
+
+Then run:
+
+terraform fmt
+terraform validate
+
+and then:
+
+terraform apply
+Even cleaner approach
+
+I would create a local:
+
+data "aws_caller_identity" "current" {}
+
+locals {
+  state_bucket_name = "kk-platform-terraform-state-${data.aws_caller_identity.current.account_id}"
+}
+
+and use:
+
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = local.state_bucket_name
+}
+
+Output it as well:
+
+output "s3_bucket_name" {
+  value = local.state_bucket_name
+}
+
+That way after bootstrap:
+
+terraform output
+
+shows:
+
+s3_bucket_name = "kk-platform-terraform-state-975050082420"
+
+which you can copy directly into your backend config.
+
+One more thing: if you still have this resource in bootstrap:
+
+resource "random_string" "suffix" {
+  ...
+}
+
+and it is no longer used anywhere, remove it completely. Otherwise Terraform will keep creating a random value that serves no purpose.

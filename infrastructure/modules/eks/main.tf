@@ -173,16 +173,16 @@ resource "aws_eks_node_group" "general" {
 
   instance_types = [
     #"t3.medium"
-    "t2.micro"
+    "t3.small"
   ]
 
   scaling_config {
 
-    desired_size = 5
+    desired_size = 2
 
     min_size = 2
 
-    max_size = 10
+    max_size = 4
   }
 
   update_config {
