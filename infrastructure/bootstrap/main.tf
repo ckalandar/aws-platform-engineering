@@ -1,13 +1,19 @@
-resource "random_string" "suffix" {
-  length  = 6
-  special = false
-  upper   = false
+#resource "random_string" "suffix" {
+#  length  = 6
+#  special = false
+#  upper   = false
+#}
+
+data "aws_caller_identity" "current" {}
+
+locals {
+  state_bucket_name = "kk-platform-terraform-state-${data.aws_caller_identity.current.account_id}"
 }
 
 resource "aws_s3_bucket" "terraform_state" {
   #bucket = var.state_bucket_name != null ? var.state_bucket_name : "${var.project_name}-terraform-state-${random_string.suffix.result}"
   #bucket = var.state_bucket_name != null ? var.state_bucket_name : "${var.project_name}-terraform-state"
-  bucket = "kk-platform-terraform-state-${data.aws_caller_identity.current.account_id}"
+  bucket = local.state_bucket_name
 
   tags = {
     Name        = var.state_bucket_name != null ? var.state_bucket_name : "${var.project_name}-terraform-state"
