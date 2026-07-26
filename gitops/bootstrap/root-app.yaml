@@ -12,7 +12,7 @@ spec:
   source:
     repoURL: https://github.com/ckalandar/aws-platform-engineering.git
     targetRevision: main
-    path: gitops/applications/appsets
+    path: gitops/appsets
 
   destination:
     server: https://kubernetes.default.svc
