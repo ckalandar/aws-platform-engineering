@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 
 metadata:
-  name: root-app
+  name: platform-app
   namespace: argocd
 
 spec:
@@ -12,17 +12,13 @@ spec:
   source:
     repoURL: https://github.com/ckalandar/aws-platform-engineering.git
     targetRevision: main
-    path: gitops/applications/appsets
+    path: gitops/applications/platform
 
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
 
   syncPolicy:
-
     automated:
       prune: true
       selfHeal: true
-
-    syncOptions:
-      - CreateNamespace=true
