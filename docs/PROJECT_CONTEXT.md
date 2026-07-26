@@ -3362,3 +3362,800 @@ resource "random_string" "suffix" {
 }
 
 and it is no longer used anywhere, remove it completely. Otherwise Terraform will keep creating a random value that serves no purpose.
+
+I have completed till step 7, but step 8 I don't get this is my repo structure and root-app.yaml in bootstrap apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: root-app
+  namespace: argocd
+
+spec:
+
+  project: default
+
+  source:
+    repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+    targetRevision: main
+    path: gitops/applications/platform
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
+
+Excellent. This is a significant milestone.
+
+Your GitOps flow is now working end-to-end:
+
+GitHub
+   ↓
+ArgoCD Root App
+   ↓
+Platform App
+   ↓
+Workloads App
+   ↓
+Nginx Application
+   ↓
+Deployment + Service + Ingress
+   ↓
+AWS Load Balancer Controller
+   ↓
+AWS ALB
+
+And the proof is here:
+
+kubectl get ingress -n demo
+
+nginx   alb   *
+k8s-demo-nginx-2e5ada922c-111350404.us-east-1.elb.amazonaws.com
+
+and
+
+aws elbv2 describe-load-balancers
+
+shows the ALB being provisioned.
+
+What actually happened
+
+You discovered a real-world production issue:
+
+Root cause
+
+ALB Controller was deployed with:
+
+--aws-vpc-id=vpc-088ed7509b53c6c49
+
+but your EKS cluster was actually in:
+
+vpc-0e57d8d5ee12ff0c2
+
+Therefore:
+
+Controller
+    ↓
+Looking for tagged subnets
+    ↓
+Wrong VPC
+    ↓
+0 subnets found
+    ↓
+Ingress reconciliation failed
+    ↓
+No ALB
+
+Exactly the type of issue platform engineers troubleshoot.
+
+What fixed it
+
+You corrected:
+
+gitops/values/aws-load-balancer-controller/dev.yaml
+
+from
+
+vpcId: vpc-088ed7509b53c6c49
+
+to
+
+vpcId: vpc-0e57d8d5ee12ff0c2
+
+ArgoCD synced:
+
+kubectl get applications -n argocd
+
+Then controller restarted with:
+
+--aws-vpc-id=vpc-0e57d8d5ee12ff0c2
+
+Then:
+
+Ingress
+   ↓
+ALB Controller
+   ↓
+Subnet Discovery
+   ↓
+Success
+   ↓
+ALB Created
+What you've built so far
+Infrastructure Layer
+
+Terraform:
+
+VPC
+Public Subnets
+Private App Subnets
+Private DB Subnets
+NAT Gateway
+Route Tables
+Security Groups
+IAM Roles
+EKS Cluster
+Managed Node Groups
+Platform Layer
+
+ArgoCD
+
+AWS Load Balancer Controller
+
+IRSA
+
+Helm
+
+GitOps
+
+Workload Layer
+
+Nginx Deployment
+
+Service
+
+Ingress
+
+ALB
+
+Now we move to the next level
+
+Current architecture:
+
+Internet
+   ↓
+ALB
+   ↓
+Nginx
+
+This proves GitOps works.
+
+Phase 9 — Production Java Application
+
+Instead of Nginx we'll deploy:
+
+Spring Boot App
+
+Example:
+
+java-login-app
+
+with:
+
+Deployment
+Service
+Ingress
+ConfigMap
+Secret
+HPA
+
+managed by ArgoCD.
+
+Repository structure:
+
+gitops/
+├── applications
+│   └── workloads
+│       └── java-login.yaml
+
+└── manifests
+    └── java-login
+        ├── deployment.yaml
+        ├── service.yaml
+        ├── ingress.yaml
+        ├── hpa.yaml
+        ├── configmap.yaml
+        └── kustomization.yaml
+Phase 10 — ExternalDNS
+
+Current:
+
+ALB DNS
+k8s-demo-nginx...
+
+Production:
+
+app.dev.company.com
+
+We install:
+
+ExternalDNS
+
+Flow:
+
+Ingress
+    ↓
+ExternalDNS
+    ↓
+Route53 Record
+    ↓
+app.dev.company.com
+Phase 11 — Cert Manager
+
+Current:
+
+HTTP
+
+Production:
+
+HTTPS
+
+Flow:
+
+Let's Encrypt
+    ↓
+Cert Manager
+    ↓
+Certificate
+    ↓
+ALB HTTPS
+Phase 12 — Observability
+
+Install:
+
+Prometheus
+Grafana
+Loki
+Promtail
+
+GitOps managed.
+
+You'll get:
+
+Cluster Metrics
+Node Metrics
+Pod Metrics
+Application Metrics
+Logs
+Dashboards
+Alerts
+Phase 13 — Autoscaling
+
+Add:
+
+Metrics Server
+HPA
+Karpenter
+
+Flow:
+
+Traffic Spike
+    ↓
+HPA scales Pods
+    ↓
+Karpenter scales Nodes
+Phase 14 — Security
+
+Add:
+
+External Secrets Operator
+AWS Secrets Manager
+
+Kyverno
+
+Network Policies
+
+OPA/Gatekeeper
+Phase 15 — Internal Developer Platform
+
+Final architecture:
+
+GitHub
+   ↓
+ArgoCD
+   ↓
+Platform Services
+    ├── ALB Controller
+    ├── ExternalDNS
+    ├── Cert Manager
+    ├── Prometheus
+    ├── Grafana
+    ├── Loki
+    ├── Karpenter
+    ├── ESO
+    └── Kyverno
+
+Workloads
+    ├── Java Login App
+    ├── Payments
+    ├── Orders
+    └── Inventory
+
+At that point you'll have built what many companies run as their platform engineering foundation.
+
+My recommendation is to proceed next with Phase 9: Deploy a Spring Boot Java Login Application through GitOps, because it introduces real application delivery, ConfigMaps, Secrets, rolling updates, and prepares the platform for observability and autoscaling.
+
+how do I access ngnix?
+
+Excellent. Your ALB is now created and attached to the Ingress.
+
+You can see:
+
+kubectl get ingress -n demo
+
+NAME    CLASS   HOSTS   ADDRESS
+nginx   alb     *       k8s-demo-nginx-2e5ada922c-111350404.us-east-1.elb.amazonaws.com
+
+and
+
+aws elbv2 describe-load-balancers
+
+shows the ALB.
+
+Step 1: Wait until ALB becomes Active
+
+Currently:
+
+"State": {
+  "Code": "provisioning"
+}
+
+Wait 1-2 minutes and check again:
+
+aws elbv2 describe-load-balancers \
+--query "LoadBalancers[*].[LoadBalancerName,State.Code]"
+
+Expected:
+
+[
+  [
+    "k8s-demo-nginx-2e5ada922c",
+    "active"
+  ]
+]
+Step 2: Access Nginx
+
+Open:
+
+http://k8s-demo-nginx-2e5ada922c-111350404.us-east-1.elb.amazonaws.com
+
+or
+
+curl http://k8s-demo-nginx-2e5ada922c-111350404.us-east-1.elb.amazonaws.com
+
+Expected:
+
+Welcome to nginx!
+Step 3: Verify Target Group Health
+
+Find target groups:
+
+aws elbv2 describe-target-groups
+
+You should see something like:
+
+k8s-demo-nginx-xxxx
+
+Get its ARN and check health:
+
+aws elbv2 describe-target-health \
+--target-group-arn <TG_ARN>
+
+Expected:
+
+{
+  "TargetHealth": {
+    "State": "healthy"
+  }
+}
+What Just Happened?
+
+You have successfully validated the complete GitOps platform flow:
+
+GitHub
+   │
+   ▼
+ArgoCD
+   │
+   ▼
+Application CR
+   │
+   ▼
+Nginx Deployment
+   │
+   ▼
+Service
+   │
+   ▼
+Ingress
+   │
+   ▼
+AWS Load Balancer Controller
+   │
+   ▼
+ALB
+   │
+   ▼
+Target Group
+   │
+   ▼
+Pods
+
+This is exactly how production EKS platforms expose applications.
+
+Before Moving On
+
+Run these commands and save the outputs:
+
+kubectl get ingress -A
+
+kubectl get svc -A
+
+kubectl get deploy -A
+
+aws elbv2 describe-load-balancers
+
+aws elbv2 describe-target-groups
+
+Understanding those objects is important because the next step is where platform engineering becomes interesting.
+
+Recommended Next Step (Platform Engineer Path)
+
+Instead of deploying random apps, build a reusable platform:
+
+Phase 1 (Current)
+
+✅ Terraform creates EKS
+
+✅ ArgoCD bootstraps cluster
+
+✅ ALB Controller installed
+
+✅ Nginx deployed through GitOps
+
+Phase 2
+
+Deploy a real application:
+
+Java Spring Boot App
+
+with:
+
+Deployment
+Service
+Ingress
+HPA
+ConfigMap
+Secret
+Resource Limits
+
+managed entirely through ArgoCD.
+
+Phase 3
+
+Add production platform components:
+
+External Secrets Operator
+cert-manager
+Metrics Server
+Karpenter
+Prometheus
+Grafana
+Loki
+Tempo
+Phase 4
+
+Build an Internal Developer Platform (IDP)
+
+Developer
+   ↓
+Git Push
+   ↓
+GitHub Actions
+   ↓
+ArgoCD
+   ↓
+EKS
+
+with:
+
+reusable Helm charts
+environment promotion
+RBAC
+multi-tenant namespaces
+observability
+security guardrails
+
+At that point you'll have a platform that resembles what many enterprise platform engineering teams run today.
+
+lets proceed further
+
+Perfect. This is a significant milestone.
+
+You have now successfully built:
+
+Terraform
+   ↓
+VPC
+   ↓
+EKS
+   ↓
+ArgoCD
+   ↓
+AWS Load Balancer Controller
+   ↓
+Nginx Application
+   ↓
+ALB
+   ↓
+Internet
+
+and validated end-to-end traffic.
+
+The screenshot confirms:
+
+Internet
+   ↓
+AWS ALB
+   ↓
+Ingress
+   ↓
+Service
+   ↓
+Pods
+
+is working correctly.
+
+Before Adding More Components
+
+I want you to understand exactly what happened.
+
+Run:
+
+kubectl get all -n demo
+
+You should see:
+
+Pod
+Deployment
+ReplicaSet
+Service
+
+Now inspect each layer.
+
+Layer 1 — Pod
+kubectl describe pod -n demo <pod-name>
+
+Understand:
+
+Node assigned
+Image used
+IP allocated
+Events
+
+Ask yourself:
+
+How did the pod get an IP?
+
+Answer:
+
+AWS VPC CNI
+
+which created ENIs and allocated VPC IPs directly to Pods.
+
+Layer 2 — Service
+kubectl describe svc nginx -n demo
+
+Observe:
+
+ClusterIP
+Endpoints
+
+Question:
+
+How does the service know where the pods are?
+
+Answer:
+
+Label selector
+Layer 3 — Ingress
+kubectl describe ingress nginx -n demo
+
+Observe:
+
+Backend:
+  nginx:80
+
+Question:
+
+Who created the ALB?
+
+Answer:
+
+AWS Load Balancer Controller
+Layer 4 — AWS
+
+Inspect:
+
+aws elbv2 describe-load-balancers
+aws elbv2 describe-target-groups
+aws elbv2 describe-listeners
+
+Understand:
+
+Ingress
+   ↓
+ALB
+   ↓
+Listener
+   ↓
+Target Group
+   ↓
+Pod IPs
+
+This architecture is used by many EKS production deployments.
+
+Next Project
+
+Now we replace "toy nginx" with a real application.
+
+Create:
+
+gitops/
+└── manifests/
+    └── java-login-app/
+
+containing:
+
+namespace.yaml
+deployment.yaml
+service.yaml
+ingress.yaml
+kustomization.yaml
+
+and create:
+
+gitops/applications/workloads/java-login-app.yaml
+
+managed by ArgoCD.
+
+Why This Matters
+
+Most engineers stop at:
+
+Nginx
+
+Platform engineers go further:
+
+Application
+ConfigMap
+Secret
+Ingress
+Autoscaling
+Observability
+Security
+GitOps
+What I Recommend Next
+
+Deploy a Spring Boot application and learn these concepts in sequence:
+
+Stage 1
+Java Login App
+
+Learn:
+
+Deployment
+Service
+Ingress
+ConfigMap
+Secret
+Stage 2
+Metrics Server
+
+Learn:
+
+CPU metrics
+Memory metrics
+
+Commands:
+
+kubectl top nodes
+kubectl top pods
+Stage 3
+Horizontal Pod Autoscaler
+
+Learn:
+
+Scale based on CPU
+Scale based on memory
+Stage 4
+Prometheus + Grafana
+
+Learn:
+
+Scraping
+Metrics
+Dashboards
+Alerting
+Stage 5
+External Secrets Operator
+
+Learn:
+
+AWS Secrets Manager
+      ↓
+External Secret
+      ↓
+Kubernetes Secret
+      ↓
+Application
+
+This is how production teams handle secrets.
+
+Stage 6
+Karpenter
+
+Learn:
+
+Pod Pending
+      ↓
+Karpenter
+      ↓
+New EC2
+      ↓
+Pod Scheduled
+Stage 7
+cert-manager
+
+Learn:
+
+Let's Encrypt
+      ↓
+Certificate
+      ↓
+HTTPS
+      ↓
+ALB
+
+My recommendation: next deploy a Spring Boot application through GitOps, then add Metrics Server + HPA before moving into observability and platform components. That sequence builds the strongest platform-engineering foundation.
+
+You are my Platform Engineering mentor.
+
+We have already completed:
+
+Terraform
+Remote State
+VPC
+EKS
+Managed Node Groups
+IRSA
+AWS Load Balancer Controller
+ArgoCD App of Apps
+GitOps
+Nginx Deployment
+ALB Exposure
+
+Current repository structure:
+<paste tree>
+
+Current goal:
+Build a production-grade Internal Developer Platform.
+
+Continue mentoring me from this point.

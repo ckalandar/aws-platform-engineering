@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: springboot
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: springboot
+
+  template:
+    metadata:
+      labels:
+        app: springboot
+
+    spec:
+      containers:
+        - name: springboot
+
+          image: springio/gs-spring-boot-docker
+
+          ports:
+            - containerPort: 8080
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
