@@ -2499,4 +2499,784 @@ bucket = "kk-platform-terraform-state"
 
 otherwise terraform init will succeed but later fail when it tries to access a bucket that doesn't belong to you.
 
+$ kubectl get pods -n argocd
+NAME                                                READY   STATUS    RESTARTS   AGE
+argocd-application-controller-0                     1/1     Running   0
+ 76s
+argocd-applicationset-controller-86d49b9f5b-l8cfx   1/1     Running   0
+ 77s
+argocd-dex-server-979d85b6c-chxzq                   1/1     Running   0
+ 77s
+argocd-notifications-controller-d65c856fb-lq7xz     1/1     Running   0
+ 77s
+argocd-redis-79fbc99c9d-sfs2n                       1/1     Running   0
+ 77s
+argocd-repo-server-5585c98dfd-t56r4                 1/1     Running   0
+ 77s
+argocd-server-84bf9d6b7f-r987g                      1/1     Running   0
+ 77s
+module.argocd.kubectl_manifest.root_app: Creation complete after 6s [id=/apis/argoproj.io/v1alpha1/namespaces/argocd/applications/root-app]
+╷
+│ Error: creating IAM Policy (kk-platform-dev-alb-controller-policy): operation error IAM: CreatePolicy, https response error StatusCode: 403, RequestID: f88aa114-227c-45f7-a86f-db159fc238ef, api error AccessDenied: User: arn:aws:iam::975050082420:user/kk_labs_user_993780 is not authorized to perform: iam:TagPolicy on resource: policy kk-platform-dev-alb-controller-policy because no identity-based policy allows the iam:TagPolicy action
+│ 
+│   with module.platform.aws_iam_policy.alb_controller,
+│   on ..\..\modules\platform\alb-controller-irsa.tf line 59, in resource "aws_iam_policy" "alb_controller":
+│   59: resource "aws_iam_policy" "alb_controller" {
+│ 
+╵
+Releasing state lock. This may take a few moments... 
+I see the file kustomization.yaml in gitops/manifests/aws-load-balancer-controller/ but it is not there in the windows explorer or ls -l gitops/manifests/aws-load-balancer-controller/
+total 1
+-rw-r--r-- 1 chilakapati.kalandar 1049089 226 Jul 25 22:51 serviceaccount.yaml
 
+chilakapati.kalandar@BDC7-L-FS7TPP3 MINGW64 ~/Documents/Devops/aws-platform-engineering/infrastructure/environments/dev (main) but can see it in VC explorer. I have created it manually and reran terraform appply still kubectl get kustomizations -A
+error: the server doesn't have a resource type "kustomizations"
+
+You have already found the root cause.
+
+Your cluster is healthy. ArgoCD is healthy. Terraform installed ArgoCD correctly.
+
+The problem is that ArgoCD is reading GitHub, not your local laptop files.
+
+Notice this error:
+
+Application referencing project platform which does not exist
+
+and
+
+$ kubectl get appprojects -n argocd
+
+NAME
+default
+
+Only the default project exists.
+
+Problem #1
+
+Your Application manifests contain:
+
+spec:
+  project: platform
+
+Example:
+
+gitops/applications/platform/aws-load-balancer-controller.yaml
+
+and
+
+gitops/applications/platform/aws-load-balancer-controller-prereqs.yaml
+
+Both have:
+
+project: platform
+
+But ArgoCD only has:
+
+default
+
+So ArgoCD marks them:
+
+SYNC STATUS   Unknown
+HEALTH STATUS Unknown
+Verify
+
+Run:
+
+kubectl get appproject platform -n argocd
+
+Expected:
+
+Error from server (NotFound)
+Problem #2
+
+You have NOT pushed your latest GitOps files to GitHub.
+
+You already said:
+
+so far I have not pushed to Git
+
+That explains everything.
+
+ArgoCD is pulling:
+
+repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+targetRevision: main
+
+ArgoCD does NOT read:
+
+C:\Users\...
+
+It only reads:
+
+GitHub main branch
+
+Therefore:
+
+Your local files:
+
+gitops/manifests/aws-load-balancer-controller/kustomization.yaml
+gitops/values/aws-load-balancer-controller/dev.yaml
+serviceaccount.yaml
+
+do not exist from ArgoCD's perspective until pushed.
+
+Check what commit ArgoCD is using
+
+You already showed:
+
+Revision:
+9ffdbac762fd37d418b7f7c68c0f0d6e3634e99c
+
+That is the GitHub commit currently deployed.
+
+Run:
+
+git rev-parse HEAD
+
+If it differs from:
+
+9ffdbac762fd37d418b7f7c68c0f0d6e3634e99c
+
+then ArgoCD is behind your local changes.
+
+What I would do next
+Option A (quickest)
+
+Change:
+
+project: platform
+
+to:
+
+project: default
+
+in both:
+
+gitops/applications/platform/aws-load-balancer-controller.yaml
+
+gitops/applications/platform/aws-load-balancer-controller-prereqs.yaml
+
+Commit and push.
+
+Option B (production)
+
+Create:
+
+gitops/projects/platform-project.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+
+metadata:
+  name: platform
+  namespace: argocd
+
+spec:
+  sourceRepos:
+    - '*'
+
+  destinations:
+    - namespace: '*'
+      server: '*'
+
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+Then ensure root-app also deploys:
+
+gitops/projects
+
+alongside applications.
+
+For now I'd use Option A because you're bootstrapping.
+
+Another issue I spotted
+
+Your Application currently shows:
+
+helm:
+  valueFiles:
+    - $values/gitops/manifests/aws-load-balancer-controller/dev-values.yaml
+
+But your repo now contains:
+
+gitops/values/aws-load-balancer-controller/dev.yaml
+
+not:
+
+gitops/manifests/aws-load-balancer-controller/dev-values.yaml
+
+So once the project issue is fixed, ArgoCD will likely fail with:
+
+values file not found
+
+Your application should reference:
+
+helm:
+  valueFiles:
+    - $values/gitops/values/aws-load-balancer-controller/dev.yaml
+
+and then be committed and pushed.
+
+Current state summary
+
+✅ EKS running
+
+✅ Node group running
+
+✅ ArgoCD pods running
+
+✅ Root app created
+
+❌ AppProject platform missing
+
+❌ Latest GitOps files not pushed to GitHub
+
+❌ ALB controller values path likely still pointing to old location
+
+Because of those three issues, ArgoCD never reaches the stage of deploying:
+
+aws-load-balancer-controller
+
+which is why:
+
+kubectl get pods -n kube-system | grep aws
+
+returns nothing.
+
+Push the Git changes first, then show me:
+
+git status
+git log --oneline -5
+kubectl get applications -n argocd
+
+and we can get the AWS Load Balancer Controller fully deployed.
+
+I have already pushed to github, git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+PS C:\Users\chilakapati.kalandar\Documents\Devops\aws-platform-engineering> git log --oneline -5
+1b6867f (HEAD -> main, origin/main) Fix ALB controller GitOps manifests
+9ffdbac updates
+a38f6e7 added GitOps
+981fdde added ALB
+01b3a15 added resources SG,EKS
+ kubectl get applications -n argocd
+NAME                                   SYNC STATUS   HEALTH STATUS
+aws-load-balancer-controller           Unknown       Unknown
+aws-load-balancer-controller-prereqs   Unknown       Unknown
+root-app                               OutOfSync     Healthy
+
+You already found the root cause in the earlier output, but now let's verify where you are.
+
+Your applications are still showing:
+
+aws-load-balancer-controller           Unknown   Unknown
+aws-load-balancer-controller-prereqs   Unknown   Unknown
+
+Earlier describe clearly showed:
+
+Application referencing project platform which does not exist
+
+and
+
+kubectl get appprojects -n argocd
+NAME
+default
+
+That means ArgoCD never created the platform AppProject.
+
+Check if project file exists in GitHub
+
+Run:
+
+curl -L https://raw.githubusercontent.com/ckalandar/aws-platform-engineering/main/gitops/projects/platform.yaml
+
+or
+
+cat gitops/projects/platform.yaml
+
+Do you actually have this file?
+
+Example:
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+
+metadata:
+  name: platform
+  namespace: argocd
+
+spec:
+  description: Platform Components
+
+  sourceRepos:
+    - '*'
+
+  destinations:
+    - namespace: '*'
+      server: '*'
+
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+Root-App is not deploying the project
+
+Current root-app points to:
+
+path: gitops/applications/platform
+
+So ArgoCD only sees:
+
+aws-load-balancer-controller.yaml
+aws-load-balancer-controller-prereqs.yaml
+
+It never sees:
+
+gitops/projects/platform.yaml
+
+Therefore:
+
+platform AppProject
+
+never gets created.
+
+Fix Option 1 (Recommended)
+
+Create:
+
+gitops/bootstrap
+├── root-app.yaml
+├── project-platform.yaml
+project-platform.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+
+metadata:
+  name: platform
+  namespace: argocd
+
+spec:
+  sourceRepos:
+    - '*'
+
+  destinations:
+    - namespace: '*'
+      server: '*'
+
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+Commit and push.
+
+Then:
+
+kubectl apply -f gitops/bootstrap/project-platform.yaml
+
+Verify:
+
+kubectl get appprojects -n argocd
+
+Expected:
+
+default
+platform
+Then force refresh
+kubectl annotate application aws-load-balancer-controller \
+  -n argocd argocd.argoproj.io/refresh=hard --overwrite
+
+and
+
+kubectl annotate application aws-load-balancer-controller-prereqs \
+  -n argocd argocd.argoproj.io/refresh=hard --overwrite
+Then check
+kubectl get applications -n argocd
+
+Expected:
+
+aws-load-balancer-controller-prereqs   Synced    Healthy
+aws-load-balancer-controller           Synced    Healthy
+root-app                               Synced    Healthy
+Another issue I noticed
+
+Your aws-load-balancer-controller.yaml currently shows:
+
+valueFiles:
+  - $values/gitops/manifests/aws-load-balancer-controller/dev-values.yaml
+
+But your repo structure is:
+
+gitops/
+└── values/
+    └── aws-load-balancer-controller/
+        dev.yaml
+
+So it should be:
+
+valueFiles:
+  - $values/gitops/values/aws-load-balancer-controller/dev.yaml
+
+If GitHub still contains dev-values.yaml, ArgoCD will fail even after the project issue is fixed.
+
+Verify:
+
+kubectl get application aws-load-balancer-controller \
+  -n argocd -o yaml | grep valueFiles -A 2
+
+If you still see:
+
+dev-values.yaml
+
+then ArgoCD is reading an older commit or the YAML in GitHub is not what you think it is.
+
+Run these two commands and share the output:
+
+kubectl get appprojects -n argocd
+kubectl get application aws-load-balancer-controller -n argocd -o yaml
+
+That will tell us whether the remaining blocker is the missing AppProject, the values file path, or both.
+
+I see the file https://raw.githubusercontent.com/ckalandar/aws-platform-engineering/refs/heads/main/gitops/projects/platform-project.yaml 
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+
+metadata:
+  name: platform
+  namespace: argocd
+
+spec:
+
+  description: Platform Components
+
+  sourceRepos:
+  - https://github.com/ckalandar/aws-platform-engineering.git
+  - https://aws.github.io/eks-charts
+
+  destinations:
+    - namespace: "*"
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+  - group: ""
+    kind: Namespace
+
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+
+Excellent. That explains why the applications are still broken.
+
+You have created the AppProject YAML in GitHub, but ArgoCD is not deploying it.
+
+Look at your root app:
+
+spec:
+  source:
+    path: gitops/applications/platform
+
+Root App only scans:
+
+gitops/applications/platform/
+
+which contains:
+
+aws-load-balancer-controller.yaml
+aws-load-balancer-controller-prereqs.yaml
+
+It does not scan:
+
+gitops/projects/
+
+Therefore this file:
+
+gitops/projects/platform-project.yaml
+
+exists in GitHub but ArgoCD never applies it.
+
+Verify
+
+Run:
+
+kubectl get appproject platform -n argocd
+
+I expect:
+
+Error from server (NotFound)
+
+because we already saw:
+
+kubectl get appprojects -n argocd
+
+returns only:
+
+default
+Quick Fix
+
+Apply the project manually once:
+
+kubectl apply -f gitops/projects/platform-project.yaml
+
+Then verify:
+
+kubectl get appprojects -n argocd
+
+Expected:
+
+default
+platform
+Then Refresh ArgoCD
+kubectl annotate application aws-load-balancer-controller \
+-n argocd argocd.argoproj.io/refresh=hard --overwrite
+
+kubectl annotate application aws-load-balancer-controller-prereqs \
+-n argocd argocd.argoproj.io/refresh=hard --overwrite
+
+or simply:
+
+kubectl annotate application root-app \
+-n argocd argocd.argoproj.io/refresh=hard --overwrite
+Production-Grade Structure
+
+Longer term, I'd restructure like this:
+
+gitops/
+├── bootstrap/
+│   ├── root-app.yaml
+│   └── platform-project.yaml
+│
+├── projects/
+│   └── platform-project.yaml
+│
+├── applications/
+│   └── platform/
+│       ├── aws-load-balancer-controller.yaml
+│       └── aws-load-balancer-controller-prereqs.yaml
+│
+├── manifests/
+│   └── aws-load-balancer-controller/
+│       ├── kustomization.yaml
+│       └── serviceaccount.yaml
+│
+└── values/
+    └── aws-load-balancer-controller/
+        └── dev.yaml
+
+Then bootstrap installs:
+
+ArgoCD
+AppProjects
+Root App
+
+and Root App installs platform applications.
+
+That's how most production GitOps repositories are organized.
+
+One More Thing To Check
+
+After creating the AppProject, run:
+
+kubectl describe application aws-load-balancer-controller -n argocd
+
+I want to verify that the Application now references:
+
+project: platform
+
+without the error:
+
+Application referencing project platform which does not exist
+
+If that error disappears, the next issue (if any) will likely be the Helm values path or ServiceAccount manifest, and we can troubleshoot those next.
+
+now the temp env got destroyed, i will be launching a new environment. Code has been checked into github, first I will bootstrap s3/dynamodb manually and then run terraform init from environments/dev, is this correct?
+
+Yes, that's the correct sequence.
+
+Given your current architecture:
+
+bootstrap/
+    ├── S3 state bucket
+    └── DynamoDB lock table
+
+environments/dev/
+    ├── VPC
+    ├── EKS
+    ├── Platform IAM
+    ├── ArgoCD
+    └── GitOps Apps
+
+the flow should be:
+
+1. Bootstrap Terraform State Backend
+
+From:
+
+infrastructure/bootstrap
+
+Run:
+
+terraform init
+terraform apply
+
+This should create:
+
+S3 Bucket
+DynamoDB Lock Table
+
+Verify:
+
+aws s3 ls
+aws dynamodb describe-table \
+  --table-name <your-lock-table>
+2. Capture Outputs
+
+Example:
+
+terraform output
+
+You should get something like:
+
+s3_bucket_name = kk-platform-terraform-state-75za4l
+dynamodb_table_name = kk-platform-terraform-locks
+3. Update Backend Config
+
+This is the part that previously caused problems.
+
+If your bootstrap creates:
+
+kk-platform-terraform-state-75za4l
+
+then your backend must use that exact bucket.
+
+Instead of hardcoding:
+
+bucket = "kk-platform-terraform-state"
+
+use a backend config file.
+
+Example:
+
+backend-dev.hcl
+
+bucket         = "kk-platform-terraform-state-75za4l"
+key            = "dev/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "kk-platform-terraform-locks"
+encrypt        = true
+4. Initialize Dev Environment
+
+From:
+
+infrastructure/environments/dev
+
+Remove old backend artifacts if needed:
+
+rm -rf .terraform
+rm .terraform.lock.hcl
+
+Then:
+
+terraform init \
+  -backend-config=backend-dev.hcl \
+  -reconfigure
+
+You previously got:
+
+Too many command line arguments
+
+because PowerShell and Git Bash handle multiline commands differently.
+
+Use either:
+
+terraform init -backend-config=backend-dev.hcl -reconfigure
+
+or in PowerShell:
+
+terraform init `
+  -backend-config=backend-dev.hcl `
+  -reconfigure
+5. Validate Backend
+
+Check:
+
+terraform state list
+
+Should return:
+
+No state file was found!
+
+for a fresh environment.
+
+That's expected.
+
+6. Deploy Platform
+
+Then:
+
+terraform plan
+terraform apply
+
+Terraform should create:
+
+VPC
+Subnets
+IGW
+NAT
+Security Groups
+EKS
+OIDC
+IRSA Role
+ArgoCD
+Root App
+7. Verify ArgoCD
+
+After apply:
+
+kubectl get pods -n argocd
+
+Expect:
+
+argocd-server
+argocd-repo-server
+argocd-application-controller
+...
+
+Then:
+
+kubectl get applications -n argocd
+
+Expected eventually:
+
+root-app
+aws-load-balancer-controller
+aws-load-balancer-controller-prereqs
+One improvement I'd make before rebuilding
+
+Your bootstrap currently generates a random bucket suffix, but your environment backend depends on knowing that bucket name.
+
+For production-grade workflows, I'd modify bootstrap so the bucket name is predictable:
+
+bucket = "kk-platform-terraform-state-${data.aws_caller_identity.current.account_id}"
+
+Result:
+
+kk-platform-terraform-state-975050082420
+
+Then every environment can derive it automatically and you don't need to edit backend files after every rebuild.
+
+For your immediate rebuild, the safest path is:
+
+Bootstrap S3 + DynamoDB.
+Note the actual bucket name created.
+Update backend-dev.hcl.
+terraform init -backend-config=backend-dev.hcl -reconfigure.
+terraform apply.
+
+That should get you back to a working EKS + ArgoCD environment much faster than the last cycle.
