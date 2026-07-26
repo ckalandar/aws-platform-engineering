@@ -2,7 +2,7 @@ clusterName: kk-platform-dev
 
 region: us-east-1
 
-vpcId: vpc-088ed7509b53c6c49
+vpcId: vpc-0e57d8d5ee12ff0c2
 
 serviceAccount:
   create: false
