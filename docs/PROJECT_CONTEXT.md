@@ -4159,3 +4159,1128 @@ Current goal:
 Build a production-grade Internal Developer Platform.
 
 Continue mentoring me from this point.
+
+Perfect.
+
+You now have a functioning GitOps platform:
+
+GitHub
+   ↓
+Root App
+   ↓
+Platform App
+   ↓
+Workloads App
+   ↓
+SpringBoot App
+
+and ArgoCD reports:
+
+springboot  Synced  Healthy
+
+which means the Application resource itself exists and ArgoCD believes the workload is healthy.
+
+Now let's validate the actual deployment before moving to the next platform component.
+
+Run:
+
+kubectl get pods -n springboot
+
+kubectl get deployment -n springboot
+
+kubectl get svc -n springboot
+
+kubectl get ingress -n springboot
+What we're verifying
+Pods
+
+Expected:
+
+NAME                          READY   STATUS
+springboot-xxxxx              1/1     Running
+springboot-yyyyy              1/1     Running
+Deployment
+
+Expected:
+
+NAME         READY
+springboot   2/2
+Service
+
+Expected:
+
+NAME         TYPE        CLUSTER-IP
+springboot   ClusterIP
+Ingress
+
+Expected:
+
+NAME         CLASS   ADDRESS
+springboot   alb     k8s-springboot-xxxxx.elb.amazonaws.com
+
+If the ADDRESS field is empty, we'll inspect the ALB controller logs.
+
+What comes after this
+
+Once SpringBoot is reachable, we start turning this into a production-style platform.
+
+Phase 1 — Container Registry
+
+Replace the demo image with:
+
+GitHub Actions
+    ↓
+Build Spring Boot JAR
+    ↓
+Docker Build
+    ↓
+Push to ECR
+
+You'll learn:
+
+ECR
+Docker image versioning
+GitHub OIDC
+CI pipelines
+Phase 2 — External Secrets
+
+Instead of:
+
+env:
+  - name: DB_PASSWORD
+
+we'll use:
+
+AWS Secrets Manager
+      ↓
+External Secrets Operator
+      ↓
+Kubernetes Secret
+      ↓
+Application
+
+This is how real platforms handle credentials.
+
+Phase 3 — Observability
+
+Deploy:
+
+Prometheus
+Grafana
+Loki
+
+Then monitor:
+
+EKS
+Nodes
+Pods
+SpringBoot JVM metrics
+Phase 4 — Karpenter
+
+Replace managed node scaling with:
+
+Pending Pod
+    ↓
+Karpenter
+    ↓
+EC2 launched automatically
+
+This is one of the most valuable EKS skills.
+
+Phase 5 — Secure Platform
+
+Add:
+
+Kyverno
+Network Policies
+Pod Security Standards
+RBAC
+IRSA everywhere
+
+For now, let's finish validating the Spring Boot deployment. Show me the output of:
+
+kubectl get pods -n springboot
+kubectl get deployment -n springboot
+kubectl get svc -n springboot
+kubectl get ingress -n springboot
+
+and then we'll wire in the first real application CI/CD pipeline (GitHub → ECR → ArgoCD).
+
+chilakapati.kalandar@BDC7-L-FS7TPP3 MINGW64 ~/Documents/Devops/aws-platform-engineering (main)
+$ kubectl get pods -n springboot
+NAME                          READY   STATUS    RESTARTS   AGE
+springboot-58bb9b8674-tstp5   1/1     Running   0          9m53s
+springboot-58bb9b8674-xhc4r   1/1     Running   0          9m53s
+
+chilakapati.kalandar@BDC7-L-FS7TPP3 MINGW64 ~/Documents/Devops/aws-platform-engineering (main)
+$ kubectl get deployment -n springboot
+NAME         READY   UP-TO-DATE   AVAILABLE   AGE
+springboot   2/2     2            2           10m
+
+chilakapati.kalandar@BDC7-L-FS7TPP3 MINGW64 ~/Documents/Devops/aws-platform-engineering (main)
+$ kubectl get svc -n springboot
+NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+springboot   ClusterIP   172.20.59.22   <none>        80/TCP    10m
+
+chilakapati.kalandar@BDC7-L-FS7TPP3 MINGW64 ~/Documents/Devops/aws-platform-engineering (main)
+$ kubectl get ingress -n springboot
+NAME         CLASS   HOSTS   ADDRESS                                                                   PORTS   AGE
+springboot   alb     *       k8s-springbo-springbo-2f4bc59496-1190605868.us-east-1.elb.amazonaws.com   80      10m
+
+Excellent. Everything is working.
+
+Your platform currently looks like this:
+
+AWS
+│
+├── VPC
+├── Public Subnets
+├── Private App Subnets
+├── NAT Gateway
+│
+├── EKS Cluster
+│
+├── Managed Node Group
+│   ├── Node 1
+│   └── Node 2
+│
+├── AWS Load Balancer Controller (IRSA)
+│
+└── ALB
+     │
+     └── SpringBoot Service
+
+And the validation proves it:
+
+Application
+springboot  Synced  Healthy
+Pods
+2/2 Running
+Service
+springboot ClusterIP
+Ingress
+k8s-springbo-springbo-2f4bc59496-1190605868.us-east-1.elb.amazonaws.com
+Verify end-to-end
+
+Open:
+
+http://k8s-springbo-springbo-2f4bc59496-1190605868.us-east-1.elb.amazonaws.com
+
+or
+
+curl http://k8s-springbo-springbo-2f4bc59496-1190605868.us-east-1.elb.amazonaws.com
+
+Let's confirm the application is actually serving traffic through:
+
+Internet
+   ↓
+ALB
+   ↓
+Ingress
+   ↓
+Service
+   ↓
+Pods
+What I would do next
+
+Up to now we've proven:
+
+Terraform provisioning
+EKS
+Managed Node Groups
+IRSA
+AWS Load Balancer Controller
+ArgoCD
+App-of-Apps
+GitOps deployment
+
+Those are foundational platform capabilities.
+
+The next major milestone is:
+
+Build a real CI/CD flow
+
+Right now ArgoCD is deploying manifests from Git.
+
+But the application image is static.
+
+A production platform needs:
+
+Developer Commit
+      ↓
+GitHub Actions
+      ↓
+Build SpringBoot
+      ↓
+Create Docker Image
+      ↓
+Push Image to ECR
+      ↓
+Update GitOps Repo
+      ↓
+ArgoCD Sync
+      ↓
+Deploy New Version
+
+This teaches:
+
+GitHub OIDC
+ECR
+Docker
+Build pipelines
+GitOps promotion
+
+These are skills used daily by Platform Engineers and Senior DevOps Engineers.
+
+My recommendation
+
+Let's stop using the demo Spring image and build our own application.
+
+Create:
+
+applications/
+└── springboot-app/
+    ├── pom.xml
+    ├── Dockerfile
+    ├── src/
+    └── .github/workflows/
+
+The application can expose:
+
+{
+  "service":"platform-demo",
+  "environment":"dev",
+  "version":"1.0.0"
+}
+
+Then we'll:
+
+Step 1
+
+Create ECR via Terraform.
+
+Step 2
+
+Create GitHub OIDC IAM Role.
+
+Step 3
+
+Build image from GitHub Actions.
+
+Step 4
+
+Push image to ECR.
+
+Step 5
+
+Update GitOps manifest automatically.
+
+Step 6
+
+Watch ArgoCD deploy the new version.
+
+That will be your first complete production-style developer workflow on the platform.
+
+This is the next thing I'd implement before observability, Karpenter, service mesh, or security tooling. It gives you the full developer → platform → Kubernetes deployment lifecycle.
+
+Perfect.
+
+What you're seeing:
+
+Hello Docker World
+
+means the entire request path is working:
+
+Browser
+   ↓
+AWS ALB
+   ↓
+Ingress
+   ↓
+Kubernetes Service
+   ↓
+SpringBoot Pods
+   ↓
+Application Response
+
+And more importantly:
+
+Git Commit
+   ↓
+GitHub
+   ↓
+ArgoCD
+   ↓
+Kubernetes Deployment
+   ↓
+ALB
+   ↓
+Live Application
+
+That is your first complete GitOps deployment.
+
+What we've actually built
+
+Many tutorials stop at:
+
+kubectl apply -f deployment.yaml
+
+You have gone much further.
+
+Infrastructure Layer
+Terraform
+├── VPC
+├── Public Subnets
+├── Private Subnets
+├── NAT Gateway
+├── IAM
+├── EKS
+└── IRSA
+Platform Layer
+ArgoCD
+├── Root App
+├── Platform App
+└── Workloads App
+Kubernetes Layer
+AWS Load Balancer Controller
+└── ALB Provisioning
+Application Layer
+SpringBoot
+├── Deployment
+├── Service
+└── Ingress
+Before moving on
+
+Let's clean up one thing.
+
+Right now your workload is using a demo image:
+
+image: springio/gs-spring-boot-docker
+
+This is good for validation but not for platform engineering.
+
+The next step should be:
+
+applications/
+└── springboot-app
+
+with:
+
+pom.xml
+Dockerfile
+src/main/java
+
+and we build our own image.
+
+What I recommend next
+Phase 1: Real Application + ECR + GitHub Actions
+
+Build:
+
+applications/springboot-app
+
+Workflow:
+
+Developer Push
+      ↓
+GitHub Actions
+      ↓
+Build JAR
+      ↓
+Docker Build
+      ↓
+Push to ECR
+      ↓
+Update GitOps Manifest
+      ↓
+ArgoCD Sync
+      ↓
+Deploy
+
+This is where you'll learn:
+
+GitHub OIDC
+ECR
+Image versioning
+CI/CD
+GitOps promotion
+Phase 2: Observability
+
+Deploy via ArgoCD:
+
+Prometheus
+Grafana
+Loki
+
+Then monitor:
+
+Cluster
+Nodes
+Pods
+SpringBoot JVM
+Phase 3: Karpenter
+
+Replace static node scaling.
+
+Learn:
+
+Pending Pod
+      ↓
+Karpenter
+      ↓
+Launch EC2
+      ↓
+Schedule Pod
+Phase 4: Security
+
+Add:
+
+Kyverno
+Network Policies
+External Secrets
+RBAC
+Pod Security Standards
+Phase 5: Internal Developer Platform
+
+Then evolve into:
+
+Developer
+    ↓
+Git Push
+    ↓
+Platform Templates
+    ↓
+CI/CD
+    ↓
+GitOps
+    ↓
+Observability
+    ↓
+Production
+
+My recommendation is to start Phase 1 immediately: create a real Spring Boot application, provision an ECR repository through Terraform, and build the GitHub Actions pipeline that publishes images and lets ArgoCD deploy them automatically.
+
+That's where the most valuable learning is now that the platform foundation is working.
+
+Goal
+
+By the end of this phase:
+
+Developer Push
+    ↓
+GitHub Actions
+    ↓
+Build Spring Boot
+    ↓
+Docker Image
+    ↓
+Push to ECR
+    ↓
+Update GitOps Manifest
+    ↓
+ArgoCD Sync
+    ↓
+Deploy New Version
+
+This is the workflow Platform Engineers build.
+
+Step 1: Create a real application repo structure
+
+Inside your existing repository:
+
+applications/
+└── springboot-app/
+    ├── pom.xml
+    ├── Dockerfile
+    ├── src/
+    │   └── main/
+    │       ├── java/
+    │       └── resources/
+    └── .github/
+        └── workflows/
+Step 2: Create a simple Spring Boot app
+
+Directory:
+
+applications/springboot-app/src/main/java/com/kk/platform/
+Application.java
+package com.kk.platform;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class Application {
+
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}
+PlatformController.java
+package com.kk.platform;
+
+import java.util.Map;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class PlatformController {
+
+    @GetMapping("/")
+    public Map<String, String> home() {
+
+        return Map.of(
+                "service", "platform-demo",
+                "environment", "dev",
+                "status", "healthy");
+    }
+}
+Step 3: pom.xml
+
+Create:
+
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.kk</groupId>
+    <artifactId>platform-demo</artifactId>
+    <version>1.0.0</version>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.3</version>
+    </parent>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+        </plugins>
+    </build>
+
+</project>
+Step 4: Dockerfile
+FROM eclipse-temurin:21-jre
+
+WORKDIR /app
+
+COPY target/platform-demo-1.0.0.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java","-jar","app.jar"]
+Step 5: Create ECR through Terraform
+
+New module:
+
+infrastructure/modules/ecr
+
+We'll create:
+
+resource "aws_ecr_repository" "springboot" {
+
+  name = "platform-demo"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  force_delete = true
+}
+
+Output:
+
+output "repository_url" {
+  value = aws_ecr_repository.springboot.repository_url
+}
+Step 6: Deploy image manually first
+
+Before building CI/CD, we validate ECR.
+
+Flow:
+
+Local Machine
+    ↓
+mvn package
+    ↓
+docker build
+    ↓
+docker push ECR
+    ↓
+Update GitOps Manifest
+    ↓
+ArgoCD Deploy
+What I want you to do now
+
+Create:
+
+applications/springboot-app/
+
+with:
+
+pom.xml
+Dockerfile
+Application.java
+PlatformController.java
+
+Commit it:
+
+git add .
+git commit -m "add springboot platform application"
+git push
+
+Then show me:
+
+tree applications/springboot-app
+
+(or find applications/springboot-app -type f on Git Bash)
+
+After that we'll build the ECR Terraform module and wire GitHub Actions into the platform.
+
+They should be under the Java package path, not directly under src.
+
+Your structure should look like this:
+
+applications/
+└── springboot-app/
+    ├── pom.xml
+    ├── Dockerfile
+    └── src/
+        └── main/
+            └── java/
+                └── com/
+                    └── kk/
+                        └── platform/
+                            ├── Application.java
+                            └── PlatformController.java
+
+This matches the package declaration at the top of the files:
+
+package com.kk.platform;
+
+The package name and directory structure must align.
+
+For example:
+
+Application.java
+
+package com.kk.platform;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}
+
+must live in:
+
+src/main/java/com/kk/platform/Application.java
+
+and
+
+PlatformController.java
+
+package com.kk.platform;
+
+must live in:
+
+src/main/java/com/kk/platform/PlatformController.java
+
+Your earlier output:
+
+applications/springboot-app/src/main/java/com/kk/platform/Application.java
+applications/springboot-app/src/main/java/com/kk/platform/PlatformController.java
+
+is exactly correct.
+
+Before moving to ECR, I'd also add:
+
+applications/springboot-app/
+└── src/
+    └── main/
+        └── resources/
+            └── application.yml
+
+with:
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+spring:
+  application:
+    name: platform-demo
+
+We'll use those health endpoints later for:
+
+ALB health checks
+Kubernetes readiness probes
+Prometheus monitoring
+Grafana dashboards
+
+Next step: run
+
+cd applications/springboot-app
+mvn clean package
+
+and show me the output if anything fails. If it builds successfully, we'll create the ECR Terraform module and start building the CI/CD pipeline.
+
+Today 10:09 PM
+[INFO] The original artifact has been renamed to C:\Users\chilakapati.kalandar\Documents\Devops\aws-platform-engineering\gitops\applications\springboot-app\target\platform-demo-1.0.0.jar.original
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  4.237 s
+[INFO] Finished at: 2026-07-26T22:07:11+05:30
+[INFO] ------------------------------------------------------------------------
+
+Perfect.
+
+You've validated the first critical checkpoint:
+
+Source Code
+    ↓
+Maven Build
+    ↓
+JAR Creation
+
+Result:
+
+BUILD SUCCESS
+platform-demo-1.0.0.jar
+
+This means:
+
+Java 21 is working
+Maven is working
+Spring Boot project structure is correct
+pom.xml is correct
+Application.java is being discovered
+PlatformController.java is being compiled
+Verify the JAR actually runs
+
+Before moving to ECR, do:
+
+java -jar target/platform-demo-1.0.0.jar
+
+Open another terminal:
+
+curl http://localhost:8080
+
+Expected:
+
+{
+  "service":"platform-demo",
+  "environment":"dev",
+  "status":"healthy"
+}
+
+If that works:
+
+Code
+ ↓
+JAR
+ ↓
+Running Application
+
+is validated.
+
+Then validate Docker
+
+Build image:
+
+docker build -t platform-demo:1.0.0 .
+
+Run:
+
+docker run -p 8080:8080 platform-demo:1.0.0
+
+Test:
+
+curl http://localhost:8080
+
+If successful:
+
+Code
+ ↓
+JAR
+ ↓
+Docker Image
+ ↓
+Running Container
+
+is validated.
+
+After Docker Works
+
+We'll move into platform engineering territory.
+
+Next implementation:
+
+Terraform
+└── modules
+    └── ecr
+
+Resources:
+
+aws_ecr_repository
+aws_ecr_lifecycle_policy
+
+Then:
+
+GitHub Actions
+     ↓
+Build JAR
+     ↓
+Build Docker Image
+     ↓
+Push to ECR
+
+Then:
+
+ArgoCD
+     ↓
+Deploy Image From ECR
+One thing I'd like to improve before CI/CD
+
+Add health endpoints now.
+
+Create:
+
+src/main/resources/application.yml
+server:
+  port: 8080
+
+spring:
+  application:
+    name: platform-demo
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+and add Actuator dependency to pom.xml:
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+
+Later we'll use:
+
+/actuator/health
+
+for:
+
+Kubernetes readiness probes
+Kubernetes liveness probes
+ALB health checks
+Prometheus scraping
+
+which are all production-grade practices.
+
+Run these next:
+
+java -jar target/platform-demo-1.0.0.jar
+
+and
+
+docker build -t platform-demo:1.0.0 .
+
+Tell me whether:
+
+the JAR starts successfully
+the Docker image builds successfully
+
+Then we'll create the ECR Terraform module and wire GitHub Actions into the platform.
+
+$ curl http://localhost:8080
+{"environment":"dev","service":"platform-demo","status":"healthy"}
+chilakapati.kalandar@BDC7-L-FS7TPP3 MINGW64 ~/Documents/Devops/aws-platform-engineering/gitops/applications/springboot-app (main)
+$ docker build -t platform-demo:1.0.0 .
+bash: docker: command not found
+
+chilakapati.kalandar@BDC7-L-FS7TPP3 MINGW64 ~/Documents/Devops/aws-platform-engineering/gitops/applications/springboot-app (main)
+$ docker build -t platform-demo:1.0.0 .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+failed to connect to the docker API at npipe:////./pipe/docker_engine; check if the path is correct and if the daemon is running: open //./pipe/docker_engine: The system cannot find the file specified.
+
+chilakapati.kalandar@BDC7-L-FS7TPP3 MINGW64 ~/Documents/Devops/aws-platform-engineering/gitops/applications/springboot-app (main)
+
+Good progress.
+
+The important part is this:
+
+curl http://localhost:8080
+
+returned:
+
+{
+  "environment":"dev",
+  "service":"platform-demo",
+  "status":"healthy"
+}
+
+That proves:
+
+Source Code
+    ↓
+Maven Build
+    ↓
+JAR
+    ↓
+Spring Boot Runtime
+
+is working correctly.
+
+The Docker error is not an application problem.
+
+Your error:
+
+failed to connect to the docker API at npipe:////./pipe/docker_engine
+
+means:
+
+Docker CLI Installed
+      ✓
+
+Docker Desktop Running
+      ✗
+
+The Docker daemon is not running.
+
+Verify Docker
+
+Run:
+
+docker version
+
+You'll probably see:
+
+Client:
+...
+
+Server:
+error during connect
+Start Docker Desktop
+
+On Windows:
+
+Start Menu
+  → Docker Desktop
+
+Wait until it shows:
+
+Docker Desktop is running
+
+Then verify:
+
+docker ps
+
+Expected:
+
+CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES
+
+(no error)
+
+Then rebuild
+
+From:
+
+gitops/applications/springboot-app
+
+run:
+
+docker build -t platform-demo:1.0.0 .
+
+Verify:
+
+docker images
+
+Expected:
+
+REPOSITORY      TAG
+platform-demo   1.0.0
+
+Run:
+
+docker run -p 8080:8080 platform-demo:1.0.0
+
+Test:
+
+curl http://localhost:8080
+While Docker is starting, let's prepare the next platform step
+
+Our current architecture is:
+
+GitHub
+   ↓
+ArgoCD
+   ↓
+EKS
+   ↓
+SpringBoot Demo
+
+But we're still using a public image in Kubernetes.
+
+The next real platform engineering milestone is:
+
+Developer
+   ↓ git push
+GitHub Actions
+   ↓
+Build JAR
+   ↓
+Build Docker Image
+   ↓
+Push to ECR
+   ↓
+ArgoCD Deploys
+   ↓
+EKS
+
+Before creating the GitHub workflow, I'd like to see your current Terraform repo structure.
+
+Show:
+
+tree infrastructure/modules -L 2
+
+or on Git Bash:
+
+find infrastructure/modules -maxdepth 2 -type d
+
+Once I see the module layout, we'll add a production-style ecr module and wire it into the platform properly.
