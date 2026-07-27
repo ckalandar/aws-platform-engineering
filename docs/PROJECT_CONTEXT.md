@@ -5284,3 +5284,117 @@ or on Git Bash:
 find infrastructure/modules -maxdepth 2 -type d
 
 Once I see the module layout, we'll add a production-style ecr module and wire it into the platform properly.
+
+Step 1: Create ECR Repository
+
+We should create this using Terraform.
+
+Example structure:
+
+modules/
+└── ecr/
+
+      main.tf
+      variables.tf
+      outputs.tf
+
+Resource:
+
+resource "aws_ecr_repository" "springboot" {
+
+  name = "springboot-app"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  force_delete = true
+}
+
+Output:
+
+output "repository_url" {
+  value = aws_ecr_repository.springboot.repository_url
+}
+Step 2: GitHub Actions
+
+We'll create:
+
+.github/workflows/
+
+springboot-ci.yaml
+
+Pipeline:
+
+Checkout
+   ↓
+Java Build
+   ↓
+Docker Build
+   ↓
+ECR Login
+   ↓
+Push Image
+
+Image tag:
+
+339713012203.dkr.ecr.us-east-1.amazonaws.com/springboot-app:${GITHUB_SHA}
+Step 3: GitOps Deployment
+
+Currently your deployment probably contains:
+
+image: nginx
+
+or
+
+image: platform-demo:1.0.0
+
+We'll change it to:
+
+image: 339713012203.dkr.ecr.us-east-1.amazonaws.com/springboot-app
+tag: latest
+
+Later:
+
+tag: 8f234ab
+Step 4: Automatic Image Updates
+
+Enterprise platforms typically use:
+
+ArgoCD Image Updater
+or
+GitHub workflow updating manifests
+
+We'll start with:
+
+GitHub Actions
+     ↓
+Update deployment.yaml
+     ↓
+Commit back to repo
+     ↓
+ArgoCD sync
+
+because it teaches GitOps fundamentals better.
+
+After CI/CD
+
+The roadmap I'd follow next is:
+
+1. ECR
+2. GitHub Actions
+3. Image promotion
+4. ExternalDNS
+5. Route53
+6. ACM certificates
+7. HTTPS ALB
+8. HPA
+9. Karpenter
+10. Monitoring Stack
+11. Loki
+12. Tempo
+13. Platform APIs
+14. Backstage
+
+The next thing I'd actually build is 
+Terraform ECR module and wire it into your existing infrastructure so that the Spring Boot image has a proper registry destination.
