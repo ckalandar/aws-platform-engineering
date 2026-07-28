@@ -46,3 +46,11 @@ output "node_group_name" {
 output "ecr_repository_url" {
   value = module.ecr.repository_url
 }
+
+output "account_id" {
+  value = data.aws_caller_identity.current.account_id
+}
+
+output "region" {
+  value = data.aws_region.current.name
+}

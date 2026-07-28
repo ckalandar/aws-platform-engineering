@@ -5398,3 +5398,365 @@ The roadmap I'd follow next is:
 
 The next thing I'd actually build is 
 Terraform ECR module and wire it into your existing infrastructure so that the Spring Boot image has a proper registry destination.
+
+Excellent. This is exactly the point where we stop using demo images and start using our own application image from ECR.
+
+Right now your deployment is still using:
+
+image: springio/gs-spring-boot-docker
+
+That means EKS is pulling a public image from Docker Hub, not the image you built and pushed.
+
+Update it to:
+
+image: 905418195910.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+
+So your deployment becomes:
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: springboot
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: springboot
+
+  template:
+    metadata:
+      labels:
+        app: springboot
+
+    spec:
+      containers:
+        - name: springboot
+
+          image: 905418195910.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+
+          ports:
+            - containerPort: 8080
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+Commit and Push
+git add .
+git commit -m "Use ECR image for springboot app"
+git push
+Watch ArgoCD
+
+Because GitOps is already working:
+
+kubectl get applications -n argocd
+
+Then:
+
+kubectl get deployment -n springboot -w
+
+You should see a rolling update.
+
+Verify Image Running
+
+Check pods:
+
+kubectl get pods -n springboot
+
+Then:
+
+kubectl describe pod <pod-name> -n springboot
+
+Look for:
+
+Image:
+905418195910.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+
+or
+
+kubectl get pods -n springboot \
+-o jsonpath='{.items[*].spec.containers[*].image}'
+
+Expected:
+
+905418195910.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+If Pods Fail With ImagePullBackOff
+
+Then we know EKS nodes cannot pull from ECR.
+
+Run:
+
+kubectl get pods -n springboot
+
+If you see:
+
+ImagePullBackOff
+
+or
+
+ErrImagePull
+
+we'll check the node IAM role.
+
+Your node role should already have:
+
+AmazonEC2ContainerRegistryReadOnly
+
+attached because we added it in the EKS module earlier.
+
+What We Are Building Now
+
+At this point you've completed:
+
+✅ Terraform VPC
+✅ Terraform EKS
+✅ IRSA
+✅ AWS Load Balancer Controller
+✅ ArgoCD App-of-Apps
+✅ NGINX Application
+✅ Spring Boot Application
+✅ ECR Repository
+✅ Docker Image Build
+✅ Docker Image Push
+
+The next major step is where the platform starts looking like a real enterprise setup:
+
+CI/CD Pipeline
+
+GitHub Actions:
+
+Developer Push
+        ↓
+Maven Build
+        ↓
+Unit Tests
+        ↓
+Docker Build
+        ↓
+Push Image → ECR
+        ↓
+Update GitOps Manifest
+        ↓
+Commit New Tag
+        ↓
+ArgoCD Sync
+        ↓
+Deploy to EKS
+
+This eliminates all manual Docker build/tag/push steps.
+
+After you've updated the deployment to use the ECR image and confirmed the pods are running from ECR, we'll build that GitHub Actions pipeline end-to-end.
+
+For your specific learning roadmap
+
+You've already completed:
+
+✅ Terraform modules
+
+✅ VPC
+
+✅ EKS
+
+✅ ALB Controller
+
+✅ ArgoCD
+
+✅ GitOps
+
+✅ Spring Boot deployment
+
+✅ ECR integration
+
+That puts you past the beginner stage.
+
+The next progression I'd follow is:
+
+Stage 1: Production Delivery
+
+Build the full CI/CD flow.
+
+Git Push
+    ↓
+GitHub Actions
+    ↓
+Build JAR
+    ↓
+Build Docker Image
+    ↓
+Push ECR
+    ↓
+Update GitOps repo
+    ↓
+ArgoCD Sync
+    ↓
+Deploy to EKS
+
+No manual Docker commands anymore.
+
+Stage 2: Observability
+
+Deploy:
+
+Prometheus
+Grafana
+Loki
+Alertmanager
+
+Learn:
+
+Metrics
+Logs
+Alerts
+SLOs
+Stage 3: Karpenter
+
+Replace static node groups with dynamic provisioning.
+
+This is one of the most valuable modern EKS skills.
+
+Stage 4: Security
+
+Add:
+
+IRSA
+External Secrets Operator
+AWS Secrets Manager
+Kyverno
+Network Policies
+Stage 5: Internal Developer Platform
+
+Build:
+
+Backstage
+   ↓
+Template
+   ↓
+GitHub Repo
+   ↓
+GitHub Actions
+   ↓
+ArgoCD
+   ↓
+EKS
+
+At that point you're no longer building a demo cluster—you'll be building the same platform concepts used by many engineering organizations.
+
+So yes, my recommendation is:
+
+Move to your personal AWS account.
+Set billing alerts.
+Keep infrastructure under Terraform.
+Destroy when you're done for the day if you want.
+Focus on learning velocity rather than squeezing every last dollar out of the environment.
+
+Given where you are now, I'd start fresh in the personal account and continue directly with the GitHub Actions → ECR → ArgoCD automated deployment pipeline. That's the next major milestone that turns your current setup into a real platform.
+
+The best place is at the root of the environment, because every module may need the account ID eventually.
+
+In your case:
+
+infrastructure/
+└── environments/
+    └── dev/
+        ├── main.tf
+        ├── variables.tf
+        ├── outputs.tf
+        ├── providers.tf
+        └── versions.tf
+
+Add it near the top of environments/dev/main.tf:
+
+data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
+
+Example:
+
+data "aws_caller_identity" "current" {}
+
+locals {
+  common = {
+    project_name = "kk-platform"
+    environment  = "dev"
+  }
+
+  account_id = data.aws_caller_identity.current.account_id
+  region     = data.aws_region.current.name
+}
+
+module "vpc" {
+  source = "../../modules/vpc"
+
+  environment  = local.common.environment
+  project_name = local.common.project_name
+
+  ...
+}
+How to use it
+
+Suppose later you need an ECR URL.
+
+Instead of:
+
+image = "905418195910.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0"
+
+you can build it dynamically:
+
+"${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/platform-demo:1.0.0"
+Even better
+
+Create outputs:
+
+output "account_id" {
+  value = data.aws_caller_identity.current.account_id
+}
+
+output "region" {
+  value = data.aws_region.current.name
+}
+
+Then:
+
+terraform output account_id
+
+returns:
+
+123456789012
+
+which is handy when logging into ECR.
+
+Before migrating
+
+I would also run:
+
+grep -R "905418195910" .
+
+or on Windows:
+
+findstr /S /I "905418195910" *
+
+and remove every hardcoded account ID you find.
+
+Typical places:
+
+GitHub Actions workflows
+ECR image URLs
+IAM role ARNs
+Trust policies
+IRSA annotations
+Helm values
+ArgoCD manifests
+
+Once that's done, your platform becomes portable and can be deployed into any AWS account with only:
+
+aws configure
+terraform apply
+
+which is exactly what we want before moving into the CI/CD and platform-engineering stages.
