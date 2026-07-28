@@ -5760,3 +5760,44 @@ aws configure
 terraform apply
 
 which is exactly what we want before moving into the CI/CD and platform-engineering stages.
+
+If image is missing
+
+Login to ECR:
+
+aws ecr get-login-password \
+--region us-east-1 | \
+docker login \
+--username AWS \
+--password-stdin \
+136863648867.dkr.ecr.us-east-1.amazonaws.com
+
+Tag:
+
+docker tag \
+platform-demo:1.0.0 \
+136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+
+Push:
+
+docker push \
+136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+Then update GitOps manifest
+
+Your deployment should contain:
+
+image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+
+not:
+
+image: 905418195910.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+
+Commit:
+
+git add .
+git commit -m "Update ECR image"
+git push
+
+ArgoCD should sync automatically.
+
+kubectl get ingress -n springboot
