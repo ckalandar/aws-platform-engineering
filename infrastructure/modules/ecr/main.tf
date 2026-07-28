@@ -8,5 +8,3 @@ resource "aws_ecr_repository" "springboot" {
 
   force_delete = true
 }
-
-########Added this for testing push

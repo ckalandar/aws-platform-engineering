@@ -10,7 +10,7 @@ module "vpc" {
   private_db_subnet_cidrs  = var.private_db_subnet_cidrs
 }
 
-# Security Groups 
+# Security Groups
 
 module "security_groups" {
 
@@ -71,4 +71,10 @@ module "argocd" {
   depends_on = [
     module.eks
   ]
+}
+
+module "ecr" {
+
+  source = "../../modules/ecr"
+
 }

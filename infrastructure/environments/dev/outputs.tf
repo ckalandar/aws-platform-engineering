@@ -42,3 +42,7 @@ output "cluster_endpoint" {
 output "node_group_name" {
   value = module.eks.node_group_name
 }
+
+output "ecr_repository_url" {
+  value = module.ecr.repository_url
+}

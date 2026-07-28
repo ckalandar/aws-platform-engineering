@@ -20,7 +20,7 @@ spec:
       containers:
         - name: springboot
 
-          image: springio/gs-spring-boot-docker
+          image: 905418195910.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
 
           ports:
             - containerPort: 8080
