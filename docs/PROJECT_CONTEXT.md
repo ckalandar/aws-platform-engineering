@@ -6774,3 +6774,517 @@ Once they are Synced and Healthy, we'll create the first DNS-managed ingress:
 springboot.dev.learnsystems.co
 
 and ExternalDNS should automatically create the Route53 record without any manual Route53 changes.
+
+aws-load-balancer-controller           Synced        Healthy
+aws-load-balancer-controller-prereqs   Synced        Healthy
+external-dns                           Synced        Healthy
+external-dns-prereqs                   Synced        Healthy
+nginx                                  Synced        Healthy
+platform-app                           Synced        Healthy
+root-app                               Synced        Healthy
+
+Perfect. ExternalDNS is deployed and healthy.
+
+Next, let's make it actually manage DNS records for your applications.
+
+Step 1: Verify ExternalDNS Pod
+kubectl get pods -n kube-system | grep external-dns
+
+Expected:
+
+external-dns-xxxxxxxxxx-xxxxx   1/1 Running
+Step 2: Check ExternalDNS Logs
+kubectl logs -n kube-system deployment/external-dns --tail=50
+
+Look for something similar to:
+
+Connected to AWS Route53
+Using hosted zone: learnsystems.co
+All records are already up to date
+
+or
+
+Desired change:
+CREATE springboot.dev.learnsystems.co
+
+Paste the output if there are any errors.
+
+Step 3: Add DNS Annotations to SpringBoot Ingress
+
+Show me your current ingress:
+
+kubectl get ingress springboot \
+-n springboot \
+-o yaml
+
+We're going to add:
+
+metadata:
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
+
+and later:
+
+alb.ingress.kubernetes.io/certificate-arn: <ACM ARN>
+alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+alb.ingress.kubernetes.io/ssl-redirect: '443'
+Step 4: Check ACM Status Again
+
+Before we enable HTTPS:
+
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9 \
+  --query 'Certificate.Status'
+
+Need:
+
+"ISSUED"
+
+before attaching it to ALB.
+
+Step 5: GitOps Structure
+
+Since your repo already has:
+
+gitops/
+├── applications/
+│   └── platform/
+│       ├── aws-load-balancer-controller.yaml
+│       ├── aws-load-balancer-controller-prereqs.yaml
+│       ├── external-dns.yaml
+│       └── external-dns-prereqs.yaml
+
+the next production-grade platform components we'll add are:
+
+platform/
+├── cert-manager.yaml
+├── cert-manager-prereqs.yaml
+├── external-secrets.yaml
+├── external-secrets-prereqs.yaml
+├── metrics-server.yaml
+├── kube-prometheus-stack.yaml
+├── loki.yaml
+├── tempo.yaml
+
+But first let's finish the DNS path completely:
+
+ALB → Route53 → springboot.dev.learnsystems.co → HTTPS
+
+Run:
+
+kubectl get ingress springboot \
+-n springboot \
+-o yaml
+
+and
+
+kubectl logs -n kube-system deployment/external-dns --tail=50
+
+and paste both outputs.
+Good. We found the problem immediately.
+
+ExternalDNS is running, but IRSA is broken.
+
+The key error is:
+
+AccessDenied: Not authorized to perform sts:AssumeRoleWithWebIdentity
+
+This means:
+
+ExternalDNS Pod
+    ↓
+ServiceAccount
+    ↓
+IAM Role
+    ↓
+OIDC Trust Policy
+
+is not matching.
+
+Exactly the same class of issue we fixed for the ALB Controller.
+
+First check the ServiceAccount
+
+Run:
+
+kubectl get sa external-dns \
+-n kube-system \
+-o yaml
+
+I need to see:
+
+annotations:
+  eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-external-dns
+Then check the IAM trust policy
+
+Run:
+
+aws iam get-role \
+  --role-name kk-platform-dev-external-dns
+
+Paste the entire AssumeRolePolicyDocument.
+
+I specifically want to verify:
+
+"sub": "system:serviceaccount:kube-system:external-dns"
+
+and
+
+"Federated": "arn:aws:iam::136863648867:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113"
+My suspicion
+
+Your Terraform module probably generated something like:
+
+"sub": "system:serviceaccount:external-dns:external-dns"
+
+or
+
+"sub": "system:serviceaccount:default:external-dns"
+
+while the pod actually runs in:
+
+kube-system
+
+That would produce exactly:
+
+sts:AssumeRoleWithWebIdentity
+AccessDenied
+
+which is what we are seeing.
+
+Run these two commands:
+
+kubectl get sa external-dns -n kube-system -o yaml
+aws iam get-role --role-name kk-platform-dev-external-dns
+
+Paste both outputs and we'll fix the trust relationship. Once that's corrected, ExternalDNS should automatically create:
+
+springboot.dev.learnsystems.co
+
+from the Ingress annotation within about a minute.
+
+kubectl get sa external-dns \
+-n kube-system \
+-o yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: external-dns-prereqs:/ServiceAccount:kube-system/external-dns
+    eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-external-dns
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"ServiceAccount","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"external-dns-prereqs:/ServiceAccount:kube-system/external-dns","eks.amazonaws.com/role-arn":"arn:aws:iam::136863648867:role/kk-platform-dev-external-dns"},"name":"external-dns","namespace":"kube-system"}}
+  creationTimestamp: "2026-07-29T12:19:54Z"
+  name: external-dns
+  namespace: kube-system
+  resourceVersion: "58052"
+  uid: c2bbe5f4-cb79-4176-b9bf-666fe8c1be7b
+kchilak@kalandars-MBP aws-platform-engineering % aws iam get-role \
+  --role-name kk-platform-dev-external-dns
+{
+    "Role": {
+        "Path": "/",
+        "RoleName": "kk-platform-dev-external-dns",
+        "RoleId": "AROAR7XNVRRR5RSQDK4AM",
+        "Arn": "arn:aws:iam::136863648867:role/kk-platform-dev-external-dns",
+        "CreateDate": "2026-07-29T11:29:50+00:00",
+        "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Federated": "arn:aws:iam::136863648867:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113"
+                    },
+                    "Action": "sts:AssumeRoleWithWebIdentity",
+                    "Condition": {
+                        "StringEquals": {
+                            "oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113:sub": "system:serviceaccount:external-dns:external-dns"
+                        }
+                    }
+                }
+            ]
+        },
+        "MaxSessionDuration": 3600,
+        "Tags": [
+            {
+                "Key": "Environment",
+                "Value": "dev"
+            },
+            {
+                "Key": "Project",
+                "Value": "kk-platform"
+            },
+            {
+                "Key": "ManagedBy",
+                "Value": "terraform"
+            }
+        ],
+        "RoleLastUsed": {}
+    }
+}
+
+Found it.
+
+Your ServiceAccount is:
+
+system:serviceaccount:kube-system:external-dns
+
+But your IAM trust policy expects:
+
+system:serviceaccount:external-dns:external-dns
+
+Notice the namespace mismatch:
+
+Expected: external-dns
+Actual:   kube-system
+
+That is exactly why STS returns:
+
+AccessDenied: Not authorized to perform sts:AssumeRoleWithWebIdentity
+Fix in Terraform
+
+Go to your external-dns-irsa module.
+
+You'll find something similar to:
+
+"${var.oidc_provider_url}:sub" = "system:serviceaccount:external-dns:external-dns"
+
+Change it to:
+
+"${var.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:external-dns"
+
+or even better:
+
+variable "namespace" {
+  default = "kube-system"
+}
+
+variable "service_account_name" {
+  default = "external-dns"
+}
+
+and:
+
+"${var.oidc_provider_url}:sub" =
+  "system:serviceaccount:${var.namespace}:${var.service_account_name}"
+Apply
+cd infrastructure/environments/dev
+
+terraform plan
+terraform apply
+Verify Trust Policy
+
+After apply:
+
+aws iam get-role \
+  --role-name kk-platform-dev-external-dns
+
+You should see:
+
+"StringEquals": {
+  "oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113:sub":
+  "system:serviceaccount:kube-system:external-dns"
+}
+Restart ExternalDNS
+kubectl rollout restart deployment external-dns -n kube-system
+
+Watch:
+
+kubectl logs -f deployment/external-dns -n kube-system
+
+The error should disappear.
+
+Instead you'll start seeing Route53 activity such as:
+
+Desired change: CREATE springboot.dev.learnsystems.co
+
+or
+
+Applying provider record filter for domain learnsystems.co
+
+One more thing before restarting:
+
+Show me your current springboot ingress manifest (the GitOps YAML, not the live object).
+
+I want to verify that you've added the ExternalDNS hostname annotation, otherwise ExternalDNS will authenticate successfully but still won't create any DNS records.
+
+but the modules/external-dns-irsa/main.tf doesn't have the "${var.oidc_provider_url}:sub" =
+  "system:serviceaccount:${var.namespace}:${var.service_account_name}"locals {
+  common_tags = {
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+data "aws_iam_policy_document" "assume_role" {
+
+  statement {
+
+    actions = [
+      "sts:AssumeRoleWithWebIdentity"
+    ]
+
+    effect = "Allow"
+
+    principals {
+      type = "Federated"
+
+      identifiers = [
+        var.oidc_provider_arn
+      ]
+    }
+
+    condition {
+      test = "StringEquals"
+
+      variable = "${replace(var.oidc_provider_url, "https://", "")}:sub"
+
+      values = [
+        "system:serviceaccount:external-dns:external-dns"
+      ]
+    }
+  }
+}
+
+resource "aws_iam_role" "external_dns" {
+
+  name = "${var.cluster_name}-external-dns"
+
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_policy" "external_dns" {
+
+  name = "${var.cluster_name}-external-dns"
+
+  policy = jsonencode({
+
+    Version = "2012-10-17"
+
+    Statement = [
+
+      {
+        Effect = "Allow"
+
+        Action = [
+          "route53:ChangeResourceRecordSets"
+        ]
+
+        Resource = [
+          "arn:aws:route53:::hostedzone/${var.hosted_zone_id}"
+        ]
+      },
+
+      {
+        Effect = "Allow"
+
+        Action = [
+          "route53:ListHostedZones",
+          "route53:ListResourceRecordSets",
+          "route53:GetHostedZone"
+        ]
+
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "external_dns" {
+
+  role = aws_iam_role.external_dns.name
+
+  policy_arn = aws_iam_policy.external_dns.arn
+}
+
+Exactly. The trust policy is being generated from this block:
+
+condition {
+  test = "StringEquals"
+
+  variable = "${replace(var.oidc_provider_url, "https://", "")}:sub"
+
+  values = [
+    "system:serviceaccount:external-dns:external-dns"
+  ]
+}
+
+The problem is here:
+
+values = [
+  "system:serviceaccount:external-dns:external-dns"
+]
+
+Your ServiceAccount actually lives in:
+
+kube-system
+
+So change it to:
+
+condition {
+  test = "StringEquals"
+
+  variable = "${replace(var.oidc_provider_url, "https://", "")}:sub"
+
+  values = [
+    "system:serviceaccount:kube-system:external-dns"
+  ]
+}
+
+Then:
+
+terraform plan
+terraform apply
+
+Verify:
+
+aws iam get-role \
+  --role-name kk-platform-dev-external-dns
+
+You should now see:
+
+"oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113:sub":
+"system:serviceaccount:kube-system:external-dns"
+
+After that restart ExternalDNS:
+
+kubectl rollout restart deployment external-dns -n kube-system
+
+Then watch logs:
+
+kubectl logs -f deployment/external-dns -n kube-system
+
+The AssumeRoleWithWebIdentity error should disappear.
+
+Since you're building a reusable platform, I'd improve the module immediately:
+
+modules/external-dns-irsa/variables.tf
+
+variable "namespace" {
+  type    = string
+  default = "kube-system"
+}
+
+variable "service_account_name" {
+  type    = string
+  default = "external-dns"
+}
+
+and in main.tf:
+
+values = [
+  "system:serviceaccount:${var.namespace}:${var.service_account_name}"
+]
+
+This prevents hardcoding namespaces and makes the IRSA module reusable for other controllers.
+
+After ExternalDNS authenticates successfully, the next thing we'll check is whether your Spring Boot Ingress contains:
+
+annotations:
+  external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
+
+Without that annotation, ExternalDNS will have AWS access but won't create any Route53 records.
