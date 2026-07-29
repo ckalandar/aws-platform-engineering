@@ -7,11 +7,14 @@ metadata:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
 
+    external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
+
 spec:
   ingressClassName: alb
 
   rules:
-    - http:
+    - host: springboot.dev.learnsystems.co
+      http:
         paths:
           - path: /
             pathType: Prefix
