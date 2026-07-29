@@ -7288,3 +7288,157 @@ annotations:
   external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
 
 Without that annotation, ExternalDNS will have AWS access but won't create any Route53 records.
+
+curl -I http://springboot.dev.learnsystems.co
+curl: (6) Could not resolve host: springboot.dev.learnsystems.co
+kchilak@kalandars-MBP aws-platform-engineering % aws acm list-certificates \
+  --region us-east-1
+{
+    "CertificateSummaryList": [
+        {
+            "CertificateArn": "arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9",
+            "DomainName": "*.dev.learnsystems.co",
+            "SubjectAlternativeNameSummaries": [
+                "*.dev.learnsystems.co"
+            ],
+            "HasAdditionalSubjectAlternativeNames": false,
+            "Status": "ISSUED",
+            "Type": "AMAZON_ISSUED",
+            "KeyAlgorithm": "RSA-2048",
+            "KeyUsages": [
+                "DIGITAL_SIGNATURE",
+                "KEY_ENCIPHERMENT"
+            ],
+            "ExtendedKeyUsages": [
+                "TLS_WEB_SERVER_AUTHENTICATION"
+            ],
+            "ExportOption": "DISABLED",
+            "InUse": false,
+            "Exported": false,
+            "RenewalEligibility": "INELIGIBLE",
+            "NotBefore": "2026-07-29T05:30:00+05:30",
+            "NotAfter": "2027-02-12T05:29:59+05:30",
+            "CreatedAt": "2026-07-29T15:51:41.900000+05:30",
+            "IssuedAt": "2026-07-29T16:24:03.629000+05:30",
+            "CertificateKeyPairOrigin": "AWS_MANAGED"
+        }
+    ]
+}
+kchilak@kalandars-MBP aws-platform-engineering % aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9 \
+> --query 'Certificate.Status'
+"ISSUED"
+
+Great. ACM is now ISSUED, so we can move directly to HTTPS.
+
+Before that, let's understand why this happened:
+
+dig springboot.dev.learnsystems.co +short
+
+worked earlier, but
+
+curl -I http://springboot.dev.learnsystems.co
+
+returns:
+
+Could not resolve host
+
+That usually means your local resolver cache hasn't updated yet, or you're using a different DNS resolver than dig.
+
+Check:
+
+nslookup springboot.dev.learnsystems.co
+
+and
+
+dig springboot.dev.learnsystems.co
+
+and
+
+host springboot.dev.learnsystems.co
+
+Let's verify the record still exists:
+
+aws route53 list-resource-record-sets \
+  --hosted-zone-id Z0279443763ABCDYC2SS \
+  --query "ResourceRecordSets[?contains(Name, 'springboot')]"
+Now enable HTTPS on the ALB
+
+Update your ingress:
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: springboot
+
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+
+    external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
+
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9
+
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+
+spec:
+  ingressClassName: alb
+
+  rules:
+    - host: springboot.dev.learnsystems.co
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: springboot
+                port:
+                  number: 80
+
+Commit and push:
+
+git add .
+git commit -m "Enable HTTPS for springboot ingress"
+git push
+
+Then watch:
+
+kubectl describe ingress springboot -n springboot
+
+You should eventually see:
+
+80
+443
+
+instead of just:
+
+80
+
+After ArgoCD syncs:
+
+kubectl get ingress -n springboot
+
+Then test:
+
+curl -k https://springboot.dev.learnsystems.co
+
+and
+
+curl -I https://springboot.dev.learnsystems.co
+
+If HTTPS works, the next step is not another app.
+
+The next platform capability should be:
+
+AWS Secrets Manager
+        ↓
+External Secrets Operator
+        ↓
+Kubernetes Secret
+        ↓
+Spring Boot Application
+
+This is where the platform starts becoming production-grade because we stop storing credentials in Git and start pulling them dynamically into workloads.

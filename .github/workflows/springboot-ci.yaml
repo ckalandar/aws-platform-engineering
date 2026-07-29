@@ -1,1 +1,71 @@
-# will be added in future
+name: Spring Boot CI
+
+on:
+
+  push:
+    branches:
+      - main
+
+    paths:
+      - "application/**"
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  build-and-push:
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: application
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build JAR
+        run: mvn clean package
+
+      - name: Build Docker Image
+        run: |
+
+          docker build \
+          -t ${{ vars.ECR_REPOSITORY }}:1.0.0 .
+
+      - name: Tag Docker Image
+        run: |
+
+          docker tag \
+          ${{ vars.ECR_REPOSITORY }}:1.0.0 \
+          ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:1.0.0
+
+      - name: Push Docker Image
+        run: |
+
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:1.0.0

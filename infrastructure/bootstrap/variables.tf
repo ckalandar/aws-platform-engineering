@@ -25,5 +25,5 @@ variable "lock_table_name" {
 variable "manage_oidc" {
   description = "When true, manage the GitHub OIDC provider and role in the current AWS account. Leave false for temporary playground environments that should only bootstrap the backend resources."
   type        = bool
-  default     = false
+  default     = true
 }
