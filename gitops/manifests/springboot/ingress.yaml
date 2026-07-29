@@ -9,6 +9,12 @@ metadata:
 
     external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
 
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9
+
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+
 spec:
   ingressClassName: alb
 
