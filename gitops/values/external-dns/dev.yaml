@@ -1,0 +1,23 @@
+serviceAccount:
+  create: false
+  name: external-dns
+
+provider:
+  name: aws
+
+policy: sync
+
+registry: txt
+
+txtOwnerId: kk-platform-dev
+
+domainFilters:
+  - learnsystems.co
+
+sources:
+  - ingress
+
+aws:
+  region: us-east-1
+
+logLevel: debug

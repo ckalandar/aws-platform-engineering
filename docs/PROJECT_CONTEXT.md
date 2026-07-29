@@ -5801,3 +5801,976 @@ git push
 ArgoCD should sync automatically.
 
 kubectl get ingress -n springboot
+
+Today 2:16 PM
+Pasted text(7).txt
+Document
+VPC has changed as it is a new deployment vpc-0c52e44ef7fe0b245, i-03e0bdf2e9cab25fb, i-0bbe745028f7f3053 are two new instances
+
+
+Good. No ExternalDNS role exists yet, which is what I expected.
+
+Before we move on, let's close the ACM investigation because it may reveal a DNS design issue.
+
+Run:
+
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9 \
+  --query 'Certificate.DomainValidationOptions'
+
+I want to see the current validation status.
+
+One thing I noticed
+
+You requested:
+
+*.dev.learnsystems.co
+
+but your Route53 hosted zone is:
+
+learnsystems.co
+
+That is perfectly valid.
+
+However, if ACM continues to stay in PENDING_VALIDATION for 20–30 minutes after:
+
+Route53 = INSYNC
+CNAME resolves publicly
+Nameservers are delegated correctly
+
+then I would delete the certificate and recreate it because occasionally ACM gets stuck.
+
+Assuming ACM becomes ISSUED
+
+The next production-grade step is:
+
+Terraform
+   ↓
+IRSA Role for ExternalDNS
+   ↓
+ExternalDNS Helm Chart
+   ↓
+ArgoCD Application
+   ↓
+Automatic Route53 Records
+
+Architecture:
+
+Ingress
+   ↓
+AWS Load Balancer Controller
+   ↓
+ALB
+
+ExternalDNS watches Ingress
+   ↓
+Creates Route53 Alias
+   ↓
+springboot.dev.learnsystems.co
+
+No manual Route53 record management.
+
+Terraform Work
+
+We'll create:
+
+modules/
+└── external-dns-irsa/
+
+Resources:
+
+aws_iam_role
+aws_iam_policy
+aws_iam_role_policy_attachment
+
+Policy permissions:
+
+route53:ChangeResourceRecordSets
+route53:ListHostedZones
+route53:ListResourceRecordSets
+route53:GetHostedZone
+
+Trust relationship:
+
+ServiceAccount:
+  external-dns
+
+Namespace:
+  external-dns
+
+via IRSA.
+
+GitOps Work
+
+New directory:
+
+gitops/
+├── applications/
+│   └── external-dns.yaml
+
+├── values/
+│   └── external-dns/
+│       └── dev.yaml
+
+Helm chart:
+
+external-dns/external-dns
+
+Values:
+
+provider: aws
+
+serviceAccount:
+  create: false
+  name: external-dns
+
+domainFilters:
+  - learnsystems.co
+
+policy: sync
+
+txtOwnerId: kk-platform-dev
+Then Your Ingress Becomes
+metadata:
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
+
+ExternalDNS automatically creates:
+
+springboot.dev.learnsystems.co
+    →
+ALB Alias
+
+in Route53.
+
+First, send me the ACM DomainValidationOptions output. If the certificate is still stuck, we'll resolve that before wiring HTTPS into the ingress. After that we'll build the ExternalDNS Terraform module and GitOps manifests.
+
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9 \
+  --query 'Certificate.DomainValidationOptions'
+[
+    {
+        "DomainName": "*.dev.learnsystems.co",
+        "ValidationDomain": "*.dev.learnsystems.co",
+        "ValidationStatus": "PENDING_VALIDATION",
+        "ResourceRecord": {
+            "Name": "_da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co.",
+            "Type": "CNAME",
+            "Value": "_72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws."
+        },
+        "ValidationMethod": "DNS"
+    }
+]
+
+This is interesting because everything appears correct from the DNS side.
+
+Let's verify from the public internet exactly what ACM is seeing.
+
+Run these commands:
+
+dig _da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co CNAME +short
+
+and
+
+dig _72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws CNAME +short
+
+and
+
+dig +trace _da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co
+Why I'm asking
+
+So far we know:
+
+✅ Hosted zone exists
+
+✅ GoDaddy delegates to Route53
+
+✅ Route53 record exists
+
+✅ Route53 change is INSYNC
+
+✅ Standard DNS lookup resolves
+
+Yet ACM still says:
+
+PENDING_VALIDATION
+
+That usually means one of only a few things:
+
+Possibility 1 — ACM hasn't rechecked yet
+
+This happens sometimes, especially if the cert was created immediately after the hosted zone.
+
+How long ago was the certificate requested?
+
+You created it around:
+
+2026-07-29T15:51:41 IST
+
+If we're still within ~30 minutes, ACM may simply be behind.
+
+Possibility 2 — Wrong hosted zone
+
+For example:
+
+learnsystems.co
+
+exists, but
+
+dev.learnsystems.co
+
+is delegated somewhere else.
+
+Let's test:
+
+dig NS dev.learnsystems.co +short
+
+If that returns nothing, that's fine.
+
+If it returns different nameservers, ACM may be querying a different zone.
+
+Possibility 3 — Certificate request got stuck
+
+This is rare, but I've seen it.
+
+If:
+
+dig +trace ...
+
+shows the record correctly all the way from root → Route53
+
+and ACM remains pending after ~30–60 minutes,
+
+then the fastest solution is:
+
+aws acm delete-certificate ...
+
+and request a fresh certificate.
+
+The DNS validation record can remain exactly the same pattern; ACM will generate a new validation CNAME.
+
+While we're waiting
+
+Your platform itself is healthy now:
+
+EKS           ✅
+IRSA          ✅
+ArgoCD        ✅
+ALB Controller ✅
+Ingress       ✅
+ALB           ✅
+Route53 Zone  ✅
+
+The next infrastructure component is still ExternalDNS.
+
+My recommendation:
+
+Verify the ACM DNS path with the three dig commands above.
+If DNS is correct and ACM is still pending after 30–60 minutes, recreate the certificate.
+In parallel, start building the ExternalDNS IRSA Terraform module and GitOps deployment.
+
+Paste the output of:
+
+dig NS dev.learnsystems.co +short
+dig +trace _da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co
+
+Those two commands will tell us whether there's any hidden delegation issue.
+
+dig _da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co CNAME +short
+_72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws.
+kchilak@kalandars-MBP aws-platform-engineering % dig _72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws CNAME +short
+kchilak@kalandars-MBP aws-platform-engineering % dig +trace _da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co
+
+; <<>> DiG 9.10.6 <<>> +trace _da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co
+;; global options: +cmd
+.			488874	IN	NS	a.root-servers.net.
+.			488874	IN	NS	b.root-servers.net.
+.			488874	IN	NS	c.root-servers.net.
+.			488874	IN	NS	d.root-servers.net.
+.			488874	IN	NS	e.root-servers.net.
+.			488874	IN	NS	f.root-servers.net.
+.			488874	IN	NS	g.root-servers.net.
+.			488874	IN	NS	h.root-servers.net.
+.			488874	IN	NS	i.root-servers.net.
+.			488874	IN	NS	j.root-servers.net.
+.			488874	IN	NS	k.root-servers.net.
+.			488874	IN	NS	l.root-servers.net.
+.			488874	IN	NS	m.root-servers.net.
+.			488874	IN	RRSIG	NS 8 0 518400 20260810170000 20260728160000 57780 . k41uAn6qRPcc3cGpLyFziMuYwMwZe/sf73GkJ/Z2B3xhbiVxrk45lLaa SJhWcogGu8ugFkb+43PR6I9xWRCM5f7aXS7cpVgjixpKKrEmrNhjagvL yfYYNE7o8rBzXtjmttnKLIABw8MW6illU3sCVjNG1N9r9VZdCFXwbYVA tAJoOsDJqjyPM2VeFOJKqDPicdL8RgHcXEIf8AUsJLpytIzHCkTZXEhF JqlZekmxEUOwuWGTid8nrExhnZiiroZFmIszK/CSJZKKAPQsrAHHjshL u6JrFoSBsrE2Jx2vZ5j+SIyvwqdXzYbwAvFOcTMxV1E6GQr8KDfA7oiX vgstDQ==
+;; Received 1097 bytes from 2401:4900:50:9::66#53(2401:4900:50:9::66) in 8 ms
+
+co.			172800	IN	NS	c.registrydns.co.
+co.			172800	IN	NS	b.registrydns.co.
+co.			172800	IN	NS	d.registrydns.co.
+co.			172800	IN	NS	a.registrydns.co.
+co.			86400	IN	DS	7786 8 2 EB84F864CBE86E913796D2C8DD81933AA2C94BBCFB73419A42250BC4 650B081B
+co.			86400	IN	RRSIG	DS 8 1 86400 20260811050000 20260729040000 57780 . Yd+XvOqTt4nVkkWLXyl3pRtfXiFOitbtJFb62yjFt/ONo6Tq/Vo+eF9z Lxs6Oj/mj+TryvMQ1lsbPuPYUDy/Kz+A6LQDID0doQki8i7/oQ40bMua ZQrlhy/Y5P0AYJ3ZLWi7ZHBcjeFDN2pJy8W047FDD/HVIMQJNHJe9zPv LiEvWNlPcqzH5VO4vRAnjCKZ4EHrB2QsdGDPn47SXcTHU6GXaZ3irL2A SX+oYY9LtViFNkPyNsUG5kF7g1+0JbDPc480oUiLXg3jX5ktKDp05sIy +yzPagiR4sFLH3DQ0xSb+j6BtWjiQRIXIlP50FxLwURqnHQc6Jk/ZYm4 2QlT4w==
+;; Received 669 bytes from 2001:503:ba3e::2:30#53(a.root-servers.net) in 166 ms
+
+learnsystems.co.	3600	IN	NS	ns-259.awsdns-32.com.
+learnsystems.co.	3600	IN	NS	ns-1667.awsdns-16.co.uk.
+learnsystems.co.	3600	IN	NS	ns-557.awsdns-05.net.
+learnsystems.co.	3600	IN	NS	ns-1406.awsdns-47.org.
+ldc0c7m112348qmhs09hokrvkepgubv6.co. 900 IN NSEC3 1 1 0 - LDC1MT97TV8H4BIAQV3DVQEJ41KCO93E  NS SOA RRSIG DNSKEY NSEC3PARAM
+ldc0c7m112348qmhs09hokrvkepgubv6.co. 900 IN RRSIG NSEC3 8 2 900 20260821005330 20260721232330 16855 co. XCU6d8J8kQYmXM8WlU1i7H+GwRmOHfz4yX1GxENHrFTyYbGYvxFlt6YO 9ZfC35sc0yL+OmYKoB7DIT5RFkS6sQyCA4lIFNmY6/laUH8WWId57CO+ ReqQYBl3rsvSCW5RrySwK23iZNJd98VyFOTVNcxUxL0XkxFEjjqoqun0 MT5LnYSxjy2iDf7IJrUPf7szcpApGvrpN44E1Ue8WKHofQ==
+k8am1khdsa0g6k8f3mensnr38daggjn0.co. 900 IN NSEC3 1 1 0 - K8AV57EH64KE4O3S1973K323THS2E192  NS DS RRSIG
+k8am1khdsa0g6k8f3mensnr38daggjn0.co. 900 IN RRSIG NSEC3 8 2 900 20260824061558 20260725044558 16855 co. jJD9YPoXwdKfzB8nXvG+tR0jBUo2aoPVLrUeR2ohiXeL2VU0YWXDk511 CCsEx7KcfEpTvvMys/N07Y0mqlgCCvJOiOVYZsyuM7VUPOVTaejxq3jX w1CDsGnzRoybsLpfHqDv/pv30YWO6KIoVwI4Qg+s/9DTprKOh+G23D5f QvsVfLW5pIS7g6A3109LtTzuRkHuVYl52voVHI9cAgSM4g==
+;; Received 769 bytes from 212.18.249.57#53(d.registrydns.co) in 248 ms
+
+_da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co. 300 IN CNAME _72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws.
+learnsystems.co.	172800	IN	NS	ns-1406.awsdns-47.org.
+learnsystems.co.	172800	IN	NS	ns-1667.awsdns-16.co.uk.
+learnsystems.co.	172800	IN	NS	ns-259.awsdns-32.com.
+learnsystems.co.	172800	IN	NS	ns-557.awsdns-05.net.
+;; Received 300 bytes from 205.251.193.3#53(ns-259.awsdns-32.com) in 7 ms
+
+This is actually very useful. The DNS chain is working correctly.
+
+Your dig +trace proves:
+
+Root DNS
+  ↓
+.co registry
+  ↓
+learnsystems.co Route53 nameservers
+  ↓
+_da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co
+  ↓
+_72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws
+
+The validation CNAME is publicly resolvable.
+
+That means:
+
+✅ GoDaddy delegation is correct
+
+✅ Route53 hosted zone is correct
+
+✅ ACM validation CNAME exists
+
+✅ Public DNS can see it
+
+The one thing I'd like to check is whether the ACM target record itself resolves.
+
+Your command:
+
+dig _72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws CNAME +short
+
+returned nothing.
+
+That's not necessarily wrong because AWS may return the final validation answer as an A/AAAA record rather than another CNAME.
+
+Run:
+
+dig _72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws +short
+
+and:
+
+nslookup _72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws
+My assessment
+
+I think your DNS is fine.
+
+We already found one major issue today:
+
+ALB Controller
+Wrong VPC
+↓
+CrashLoopBackOff
+↓
+No ALBs
+
+which is now fixed.
+
+For ACM, the evidence currently points to:
+
+DNS Correct
+Route53 INSYNC
+ACM hasn't completed validation yet
+
+or ACM got stuck on the original validation attempt.
+
+If status remains pending after ~1 hour
+
+I would not spend more time debugging DNS.
+
+I would:
+
+aws acm delete-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9
+
+then immediately request a new certificate for:
+
+*.dev.learnsystems.co
+
+and create the new validation CNAME.
+
+I've seen ACM occasionally get stuck even though the DNS is correct.
+
+Meanwhile, let's move the platform forward
+
+At this stage your platform looks like:
+
+Terraform
+   ↓
+VPC
+   ↓
+EKS
+   ↓
+IRSA
+   ↓
+ArgoCD
+   ↓
+AWS Load Balancer Controller
+   ↓
+Ingress
+   ↓
+ALB
+
+The next production component should be:
+
+ExternalDNS
+
+because then:
+
+springboot.dev.learnsystems.co
+
+will be created automatically from the Ingress instead of manually managing Route53 records.
+
+Since you already have:
+
+Hosted Zone:
+learnsystems.co
+
+Hosted Zone ID:
+Z0279443763ABCDYC2SS
+
+the next step I'd recommend is creating the ExternalDNS IRSA role in Terraform and then deploying ExternalDNS through ArgoCD. That will complete the DNS automation layer of your platform.
+
+======= External DNS through ArgoCD ==========
+
+Excellent. The Terraform outputs look healthy.
+
+Most importantly:
+
+cluster_name = "kk-platform-dev"
+vpc_id       = "vpc-0c52e44ef7fe0b245"
+
+matches what your ALB controller is now using:
+
+--cluster-name=kk-platform-dev
+--aws-vpc-id=vpc-0c52e44ef7fe0b245
+
+which explains why the controller finally came up.
+
+Where we are now
+
+You have:
+
+✅ VPC
+✅ EKS
+✅ IRSA working
+✅ AWS Load Balancer Controller working
+✅ ArgoCD working
+✅ SpringBoot deployed
+✅ ALB created automatically
+
+kubectl get ingress -A
+
+showed:
+
+k8s-demo-nginx-...
+k8s-springbo-springbo-...
+
+So Kubernetes → ALB provisioning is working.
+
+Next objective
+
+Since you already own:
+
+learnsystems.co
+
+and Route53 delegation is correct, the next platform component should be:
+
+ExternalDNS
+
+This will allow:
+
+springboot.dev.learnsystems.co
+
+to be created automatically from Ingress annotations.
+
+No manual Route53 record creation.
+
+This is how production GitOps platforms operate.
+
+Before continuing
+
+I need to know whether your ExternalDNS IRSA module actually requires hosted_zone_id.
+
+Please show:
+
+cat ../../modules/iam/external-dns-irsa/variables.tf
+
+and:
+
+grep -R "route53" ../../modules/iam/external-dns-irsa
+
+because there are two possibilities:
+
+Option A
+
+Policy scoped to one hosted zone
+
+arn:aws:route53:::hostedzone/${var.hosted_zone_id}
+
+Then the Route53 lookup we discussed is needed.
+
+Option B
+
+Policy is already:
+
+route53:ChangeResourceRecordSets
+route53:ListHostedZones
+route53:ListResourceRecordSets
+
+for all zones.
+
+Then we don't need hosted_zone_id at all.
+
+After ExternalDNS is installed, we'll move to:
+
+ExternalDNS
+ACM certificate for *.dev.learnsystems.co
+HTTPS listener on ALB
+ArgoCD application for SpringBoot
+springboot.dev.learnsystems.co
+cert-manager
+Prometheus
+Grafana
+Loki
+Production-grade observability stack
+
+Let's inspect the ExternalDNS IRSA module first so we wire it correctly rather than guessing.
+
+cat ../../modules/external-dns-irsa/variables.tf
+variable "cluster_name" {}
+variable "oidc_provider_arn" {}
+variable "oidc_provider_url" {}
+variable "hosted_zone_id" {}
+variable "project_name" {}
+variable "environment" {}
+kchilak@kalandars-MBP dev % grep -R "route53" ../../modules/external-dns-irsa
+../../modules/external-dns-irsa/main.tf:          "route53:ChangeResourceRecordSets"
+../../modules/external-dns-irsa/main.tf:          "arn:aws:route53:::hostedzone/${var.hosted_zone_id}"
+../../modules/external-dns-irsa/main.tf:          "route53:ListHostedZones",
+../../modules/external-dns-irsa/main.tf:          "route53:ListResourceRecordSets",
+../../modules/external-dns-irsa/main.tf:          "route53:GetHostedZone"
+
+Perfect. Now we know exactly which path your module is taking.
+
+Your module is scoping Route53 permissions to a specific hosted zone, so hosted_zone_id is required.
+
+The policy is effectively doing something like:
+
+{
+  "Action": [
+    "route53:ChangeResourceRecordSets"
+  ],
+  "Resource": [
+    "arn:aws:route53:::hostedzone/${var.hosted_zone_id}"
+  ]
+}
+
+Therefore this is correct:
+
+data "aws_route53_zone" "main" {
+  name         = "learnsystems.co"
+  private_zone = false
+}
+
+and
+
+module "external_dns_irsa" {
+  source = "../../modules/external-dns-irsa"
+
+  cluster_name      = module.eks.cluster_name
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_provider_url
+
+  hosted_zone_id = data.aws_route53_zone.main.zone_id
+
+  project_name = var.project_name
+  environment  = var.environment
+}
+But first fix the EKS module output
+
+Earlier Terraform failed with:
+
+module.eks.oidc_provider_url
+does not exist
+
+You currently only expose:
+
+output "oidc_provider_arn" {
+  value = aws_iam_openid_connect_provider.eks.arn
+}
+
+You need another output.
+
+modules/eks/outputs.tf
+
+Add:
+
+output "oidc_provider_url" {
+  value = replace(
+    aws_iam_openid_connect_provider.eks.url,
+    "https://",
+    ""
+  )
+}
+
+The IRSA trust policy usually expects:
+
+oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113
+
+without the https://.
+
+Then run
+terraform fmt -recursive
+
+terraform validate
+
+terraform plan
+Expected result
+
+Terraform should create:
+
+aws_iam_role.external_dns
+
+aws_iam_policy.external_dns
+
+aws_iam_role_policy_attachment.external_dns
+
+(or similarly named resources depending on your module).
+
+Next step after Terraform succeeds
+
+We'll create:
+
+gitops/apps/external-dns
+
+and deploy ExternalDNS via ArgoCD.
+
+Then we'll annotate the SpringBoot ingress:
+
+external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
+
+and watch ExternalDNS automatically create:
+
+springboot.dev.learnsystems.co
+      ↓
+ALB DNS NAME
+
+inside Route53.
+
+At that point you'll have a fully automated chain:
+
+Git Commit
+    ↓
+ArgoCD Sync
+    ↓
+Ingress Created
+    ↓
+ALB Created
+    ↓
+ExternalDNS Creates DNS Record
+    ↓
+springboot.dev.learnsystems.co
+
+which is the foundation of a production GitOps platform.
+
+let me correct you the gitops repo structure is 
+
+Yes, thanks for correcting that. Looking at your screenshot, your GitOps repo structure is actually more mature than what I assumed.
+
+Your structure appears to be:
+
+gitops/
+├── applications/
+│   ├── platform/
+│   │   ├── aws-load-balancer-controller.yaml
+│   │   └── aws-load-balancer-controller-prereqs.yaml
+│   │
+│   ├── springboot-app/
+│   └── workloads/
+│
+├── appsets/
+│
+├── bootstrap/
+│
+├── manifests/
+│   ├── aws-load-balancer-controller/
+│   │   ├── kustomization.yaml
+│   │   └── serviceaccount.yaml
+│   │
+│   ├── nginx/
+│   │
+│   └── springboot/
+│       ├── deployment.yaml
+│       ├── service.yaml
+│       ├── ingress.yaml
+│       └── kustomization.yaml
+│
+├── projects/
+│
+└── values/
+    └── aws-load-balancer-controller/
+        ├── dev.yaml
+        ├── stage.yaml
+        └── prod.yaml
+
+Which means:
+
+Platform Layer
+applications/platform/
+
+contains ArgoCD Applications for cluster-level components:
+
+AWS Load Balancer Controller
+ExternalDNS (next)
+Cert Manager (later)
+Metrics Server
+Karpenter
+Prometheus
+Grafana
+Argo Rollouts
+Workload Layer
+manifests/springboot/
+
+contains raw manifests or kustomize overlays for applications.
+
+Environment Configuration
+values/
+
+contains environment-specific values used by Helm applications.
+
+This is exactly where:
+
+values/external-dns/dev.yaml
+
+should live.
+
+Next Component: ExternalDNS
+
+Instead of creating:
+
+gitops/apps/external-dns
+
+like I suggested earlier, it should fit your repo pattern:
+
+gitops/
+├── applications/
+│   └── platform/
+│       └── external-dns.yaml
+
+├── values/
+│   └── external-dns/
+│       ├── dev.yaml
+│       ├── stage.yaml
+│       └── prod.yaml
+
+which matches your ALB Controller implementation.
+
+Before we continue
+
+Let's verify Terraform first.
+
+Did you already add:
+
+output "oidc_provider_url" {
+  value = replace(
+    aws_iam_openid_connect_provider.eks.url,
+    "https://",
+    ""
+  )
+}
+
+to:
+
+modules/eks/outputs.tf
+
+and does:
+
+terraform plan
+
+now succeed?
+
+If yes, we'll build the ExternalDNS IRSA role, ArgoCD Application, Helm values, and then automate:
+
+springboot.dev.learnsystems.co
+        ↓
+Route53
+        ↓
+ALB
+        ↓
+SpringBoot
+
+using the same GitOps pattern you're already using for the ALB controller.
+
+these should go under gitops/applications/platform - external-dns-prereqs.yaml
+- external-dns.yaml
+
+Yes. Based on the repo structure you showed earlier, these should be peer applications to the ALB controller applications and belong under:
+
+gitops/
+└── applications/
+    └── platform/
+        ├── aws-load-balancer-controller-prereqs.yaml
+        ├── aws-load-balancer-controller.yaml
+        ├── external-dns-prereqs.yaml
+        └── external-dns.yaml
+
+Create them exactly like you did for ALB.
+
+gitops/applications/platform/external-dns-prereqs.yaml
+
+This creates the ServiceAccount with the IRSA role.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: external-dns-prereqs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+
+spec:
+
+  project: default
+
+  source:
+    repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+    targetRevision: main
+    path: gitops/manifests/external-dns
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+gitops/applications/platform/external-dns.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: external-dns
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+
+spec:
+
+  project: default
+
+  destination:
+    namespace: kube-system
+    server: https://kubernetes.default.svc
+
+  sources:
+
+    - repoURL: https://kubernetes-sigs.github.io/external-dns
+      chart: external-dns
+      targetRevision: 1.18.0
+
+      helm:
+        valueFiles:
+          - $values/gitops/values/external-dns/dev.yaml
+
+    - repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+      targetRevision: main
+      ref: values
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
+
+Now create the manifest directory:
+
+gitops/
+└── manifests/
+    └── external-dns/
+        └── serviceaccount.yaml
+gitops/manifests/external-dns/serviceaccount.yaml
+
+Replace the role ARN with the one Terraform created:
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-dns
+  namespace: kube-system
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-external-dns
+
+Create values directory:
+
+gitops/
+└── values/
+    └── external-dns/
+        └── dev.yaml
+gitops/values/external-dns/dev.yaml
+serviceAccount:
+  create: false
+  name: external-dns
+
+provider:
+  name: aws
+
+policy: sync
+
+registry: txt
+
+txtOwnerId: kk-platform-dev
+
+domainFilters:
+  - learnsystems.co
+
+sources:
+  - ingress
+
+aws:
+  region: us-east-1
+
+logLevel: debug
+
+Then add these two applications to whatever parent ArgoCD app-of-apps directory you're using (likely gitops/applications/platform/kustomization.yaml or equivalent).
+
+After committing and pushing:
+
+git add .
+git commit -m "Add external-dns"
+git push
+
+Then verify:
+
+kubectl get applications -n argocd
+
+You should see:
+
+external-dns-prereqs
+external-dns
+
+Once they are Synced and Healthy, we'll create the first DNS-managed ingress:
+
+springboot.dev.learnsystems.co
+
+and ExternalDNS should automatically create the Route53 record without any manual Route53 changes.

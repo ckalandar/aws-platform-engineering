@@ -54,3 +54,7 @@ output "account_id" {
 output "region" {
   value = data.aws_region.current.region
 }
+
+output "oidc_provider_url" {
+  value = module.eks.oidc_provider_url
+}

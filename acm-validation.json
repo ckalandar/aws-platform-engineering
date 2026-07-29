@@ -1,0 +1,18 @@
+{
+  "Comment": "ACM validation",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "_da69ec0d33afef094df50beb59e778a7.dev.learnsystems.co.",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "_72c5e05ce759cf8129cecf29ce9bba6a.jkddzztszm.acm-validations.aws."
+          }
+        ]
+      }
+    }
+  ]
+}

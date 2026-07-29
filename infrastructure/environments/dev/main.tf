@@ -82,3 +82,26 @@ module "ecr" {
   source = "../../modules/ecr"
 
 }
+
+# External DNS IRSA
+#
+data "aws_route53_zone" "main" {
+  name         = "learnsystems.co"
+  private_zone = false
+}
+module "external_dns_irsa" {
+
+  source = "../../modules/external-dns-irsa"
+
+  cluster_name = module.eks.cluster_name
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+
+  oidc_provider_url = module.eks.oidc_provider_url
+
+  hosted_zone_id = data.aws_route53_zone.main.zone_id
+
+  project_name = var.project_name
+
+  environment = var.environment
+}

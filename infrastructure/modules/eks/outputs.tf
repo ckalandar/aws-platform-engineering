@@ -31,3 +31,12 @@ output "oidc_issuer_url" {
 output "cluster_certificate_authority_data" {
   value = aws_eks_cluster.this.certificate_authority[0].data
 }
+
+output "oidc_provider_url" {
+  description = "OIDC provider URL without https://"
+  value = replace(
+    aws_iam_openid_connect_provider.eks.url,
+    "https://",
+    ""
+  )
+}
