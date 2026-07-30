@@ -1,0 +1,35 @@
+apiVersion: external-secrets.io/v1
+
+kind: ExternalSecret
+
+metadata:
+  name: app-config
+  namespace: springboot
+
+spec:
+
+  refreshInterval: 1m
+
+  secretStoreRef:
+    name: aws-secretsmanager
+    kind: SecretStore
+
+  target:
+    name: app-config
+
+  data:
+
+    - secretKey: username
+      remoteRef:
+        key: springboot/dev/app-config
+        property: username
+
+    - secretKey: password
+      remoteRef:
+        key: springboot/dev/app-config
+        property: password
+
+    - secretKey: apiKey
+      remoteRef:
+        key: springboot/dev/app-config
+        property: apiKey
