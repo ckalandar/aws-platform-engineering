@@ -105,3 +105,22 @@ module "external_dns_irsa" {
 
   environment = var.environment
 }
+
+module "external_secrets_irsa" {
+
+  source = "../../modules/external-secrets-irsa"
+
+  cluster_name = module.eks.cluster_name
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+
+  oidc_provider_url = module.eks.oidc_provider_url
+
+  project_name = var.project_name
+
+  environment = var.environment
+
+  namespace = "external-secrets"
+
+  service_account_name = "external-secrets"
+}
