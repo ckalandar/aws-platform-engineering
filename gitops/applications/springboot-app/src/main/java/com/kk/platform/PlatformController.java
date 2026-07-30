@@ -30,7 +30,7 @@ public class PlatformController {
     public Map<String, String> version() {
 
         return Map.of(
-                "version", "v2",
+                "version", "v3",
                 "service", "platform-demo");
     }
 }

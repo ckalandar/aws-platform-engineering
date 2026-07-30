@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "springboot-app/**"
+      - "gitops/applications/springboot-app/**"
 
 permissions:
   id-token: write
@@ -23,7 +23,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: springboot-app
+        working-directory: gitops/applications/springboot-app
 
     steps:
 
