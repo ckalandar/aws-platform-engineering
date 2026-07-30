@@ -9838,3 +9838,421 @@ ArgoCD-managed deployment
 SpringBoot metrics
 
 because once secrets are working end-to-end, observability gives the biggest increase in platform maturity.
+
+validate these files package com.kk.platform;
+
+import java.util.Map;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class PlatformController {
+
+    @GetMapping("/")
+    public Map<String, String> home() {
+
+        return Map.of(
+                "service", "platform-demo",
+                "environment", "dev",
+                "status", "healthy");
+    }
+
+    @GetMapping("/health")
+    public Map<String, String> health() {
+
+        return Map.of(
+                "service", "platform-demo",
+                "environment", "dev",
+                "status", "healthy");
+    }
+
+    @GetMapping("/version")
+    public Map<String, String> version() {
+
+        return Map.of(
+                "version", "v3",
+                "service", "platform-demo");
+    }
+
+    @Value("${APP_USERNAME:unknown}")
+    private String username;
+
+    @GetMapping("/config")
+    public Map<String, String> config() {
+
+    return Map.of(
+        "username", username,
+        "service", "platform-demo"
+    );
+}
+gitops/manifests/springboot/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: springboot
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: springboot
+
+  template:
+    metadata:
+      labels:
+        app: springboot
+
+    spec:
+      containers:
+        - name: springboot
+
+          image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:d8e7d0bae551e2d848a4c3d53c34c27a7090d0b4
+          #image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:d8e7d0bae551e2d848a4c3d53c34c27a7090d0b4
+
+          ports:
+            - containerPort: 8080
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+              env:
+                - name: APP_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-config
+                      key: username
+
+                - name: APP_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-config
+                      key: password
+
+                - name: APP_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-config
+                      key: apiKey
+
+There are a couple of issues in both files.
+
+1. PlatformController.java
+
+You're missing the @Value import and the class closing brace.
+
+Correct version
+package com.kk.platform;
+
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class PlatformController {
+
+    @Value("${APP_USERNAME:unknown}")
+    private String username;
+
+    @GetMapping("/")
+    public Map<String, String> home() {
+
+        return Map.of(
+                "service", "platform-demo",
+                "environment", "dev",
+                "status", "healthy");
+    }
+
+    @GetMapping("/health")
+    public Map<String, String> health() {
+
+        return Map.of(
+                "service", "platform-demo",
+                "environment", "dev",
+                "status", "healthy");
+    }
+
+    @GetMapping("/version")
+    public Map<String, String> version() {
+
+        return Map.of(
+                "version", "v3",
+                "service", "platform-demo");
+    }
+
+    @GetMapping("/config")
+    public Map<String, String> config() {
+
+        return Map.of(
+                "username", username,
+                "service", "platform-demo");
+    }
+}
+Alternative (my preference)
+
+Since these are environment variables and not Spring properties, use:
+
+@GetMapping("/config")
+public Map<String, String> config() {
+
+    return Map.of(
+            "username", System.getenv("APP_USERNAME"),
+            "service", "platform-demo");
+}
+
+This avoids Spring property binding confusion and makes it obvious the value comes from the pod environment.
+
+2. deployment.yaml
+
+Your YAML indentation is wrong.
+
+Currently you have:
+
+resources:
+  requests:
+    ...
+  limits:
+    ...
+    env:
+      ...
+
+which means Kubernetes interprets env as part of limits, which is invalid.
+
+Correct placement
+containers:
+  - name: springboot
+
+    image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:d8e7d0bae551e2d848a4c3d53c34c27a7090d0b4
+
+    ports:
+      - containerPort: 8080
+
+    env:
+      - name: APP_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: app-config
+            key: username
+
+      - name: APP_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: app-config
+            key: password
+
+      - name: APP_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: app-config
+            key: apiKey
+
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+Before committing
+
+Validate locally:
+
+mvn clean package
+
+Then:
+
+kubectl apply --dry-run=client \
+-f gitops/manifests/springboot/deployment.yaml
+
+Commit and push.
+
+After ArgoCD syncs:
+
+kubectl rollout status deployment/springboot -n springboot
+
+Verify the env vars reached the pod:
+
+kubectl exec -it \
+$(kubectl get pod -n springboot -o jsonpath='{.items[0].metadata.name}') \
+-n springboot -- env | grep APP_
+
+Expected:
+
+APP_USERNAME=admin
+APP_PASSWORD=SuperSecret123
+APP_API_KEY=abc123xyz
+
+Then test:
+
+curl -k https://springboot.dev.learnsystems.co/config
+
+Expected:
+
+{
+  "username":"admin",
+  "service":"platform-demo"
+}
+
+That will prove the complete chain:
+
+AWS Secrets Manager
+        ↓
+External Secrets Operator
+        ↓
+Kubernetes Secret
+        ↓
+Pod Environment Variables
+        ↓
+SpringBoot Application
+        ↓
+Public Endpoint
+
+kubectl exec -it \
+$(kubectl get pod -n springboot -o jsonpath='{.items[0].metadata.name}') \
+-n springboot -- env | grep APP_
+APP_USERNAME=admin
+APP_PASSWORD=SuperSecret123
+APP_API_KEY=abc123xyz
+kchilak@kalandars-MBP aws-platform-engineering % curl -k https://springboot.dev.learnsystems.co/config
+{"service":"platform-demo","username":"admin"}%   
+
+Excellent. This is now fully working.
+
+You've successfully proven:
+
+AWS Secrets Manager
+        ↓
+IRSA
+        ↓
+External Secrets Operator
+        ↓
+ClusterSecretStore
+        ↓
+ExternalSecret
+        ↓
+Kubernetes Secret
+        ↓
+Pod Environment Variables
+        ↓
+SpringBoot Application
+        ↓
+ALB
+        ↓
+Internet
+
+And you've validated every layer:
+
+kubectl get clustersecretstore
+
+✅ Valid
+
+kubectl get externalsecret -n springboot
+
+✅ SecretSynced
+
+kubectl get secret app-config -n springboot
+
+✅ Secret created
+
+kubectl exec ... env | grep APP_
+
+✅ Environment variables injected
+
+curl https://springboot.dev.learnsystems.co/config
+
+✅ Application consuming secret
+
+Response:
+
+{
+  "service":"platform-demo",
+  "username":"admin"
+}
+
+Now let's move immediately to the next platform capability:
+
+Observability Stack
+
+We already have:
+
+GitOps
+ArgoCD
+EKS
+ALB Controller
+External DNS
+External Secrets
+IRSA
+SpringBoot App
+
+The next thing every platform team adds is:
+
+Prometheus
+Grafana
+Loki
+Alertmanager
+
+Architecture:
+
+SpringBoot
+     │
+     ▼
+Actuator Metrics
+     │
+     ▼
+Prometheus
+     │
+     ├── Alerts
+     │
+     ▼
+Grafana Dashboards
+
+Pods Logs
+     │
+     ▼
+Promtail
+     │
+     ▼
+Loki
+     │
+     ▼
+Grafana
+
+We'll build it GitOps-first exactly like the rest of your platform:
+
+gitops/applications/platform/
+    monitoring.yaml
+
+gitops/values/monitoring/
+    dev.yaml
+
+using the:
+
+kube-prometheus-stack
+
+Helm chart.
+
+This gives you:
+
+Prometheus
+Grafana
+Alertmanager
+Node Exporter
+kube-state-metrics
+
+in one deployment.
+
+Before we write manifests, show me:
+
+tree gitops/values
+
+I want to see your current values directory structure so we place the monitoring values file consistently with the way you've already organized ALB Controller and External DNS.
