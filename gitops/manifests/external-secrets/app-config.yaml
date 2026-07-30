@@ -12,7 +12,7 @@ spec:
 
   secretStoreRef:
     name: aws-secretsmanager
-    kind: SecretStore
+    kind: ClusterSecretStore
 
   target:
     name: app-config
