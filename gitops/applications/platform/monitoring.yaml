@@ -4,9 +4,8 @@ kind: Application
 metadata:
   name: monitoring
   namespace: argocd
-  metadata:
-    annotations:
-      argocd.argoproj.io/sync-wave: "0"
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 
 spec:
 

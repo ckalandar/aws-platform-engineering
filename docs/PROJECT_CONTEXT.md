@@ -10256,3 +10256,87 @@ Before we write manifests, show me:
 tree gitops/values
 
 I want to see your current values directory structure so we place the monitoring values file consistently with the way you've already organized ALB Controller and External DNS.
+This is actually a very useful clue.
+
+The CRDs now exist, but the operator never created any Prometheus or Alertmanager custom resources.
+
+That means one of these is happening:
+
+ArgoCD never reapplied the monitoring manifests after CRDs became available.
+The Helm chart is not rendering the Prometheus/Alertmanager resources.
+ArgoCD sync is still failing silently.
+
+Let's inspect the actual state.
+
+Check ArgoCD health
+kubectl get application monitoring -n argocd -o yaml | grep -A20 health:
+Check current sync errors
+kubectl describe application monitoring -n argocd
+
+Look specifically for:
+
+Operation State
+Conditions
+Sync Status
+Message
+Check what resources ArgoCD thinks belong to monitoring
+kubectl get application monitoring -n argocd -o yaml | grep -A100 resources:
+
+or:
+
+kubectl get application monitoring -n argocd -o jsonpath='{.status.resources[*].kind}'
+
+If Prometheus and Alertmanager are missing there, Helm never rendered them.
+
+Check whether the chart rendered them
+
+Let's inspect the generated manifests:
+
+kubectl get secret -n argocd | grep monitoring
+
+Then:
+
+kubectl get application monitoring -n argocd -o yaml > /tmp/monitoring-app.yaml
+
+But an easier test is:
+
+helm template monitoring prometheus-community/kube-prometheus-stack \
+  --version 78.0.0 \
+  -f gitops/values/monitoring/dev.yaml | grep "^kind:"
+
+Look for:
+
+kind: Prometheus
+kind: Alertmanager
+
+If they're missing, something in values is disabling them.
+
+Also check the monitoring Application
+
+Show the full file:
+
+cat gitops/applications/platform/monitoring.yaml
+
+I want to verify:
+
+sources:
+
+structure.
+
+The chart version you're using should absolutely create:
+
+Prometheus
+Alertmanager
+
+by default.
+
+Since Grafana, node-exporter, kube-state-metrics, and the operator are running, the chart itself is installing successfully. The missing piece is specifically the custom resources.
+
+My suspicion right now is that the monitoring Application failed during the original CRD installation, and ArgoCD never retried rendering the missing resources after the CRDs appeared.
+
+Run these two commands and paste the output:
+
+kubectl describe application monitoring -n argocd
+cat gitops/applications/platform/monitoring.yaml
+
+Those will tell us exactly whether we're dealing with an ArgoCD sync issue or a Helm rendering issue.
