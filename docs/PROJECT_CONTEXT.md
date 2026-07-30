@@ -7442,3 +7442,347 @@ Kubernetes Secret
 Spring Boot Application
 
 This is where the platform starts becoming production-grade because we stop storing credentials in Git and start pulling them dynamically into workloads.
+Excellent. Your platform is now working end-to-end.
+
+The evidence:
+
+curl -k https://springboot.dev.learnsystems.co
+
+{"status":"healthy","service":"platform-demo","environment":"dev"}
+
+This means:
+
+✅ Route53 record created by ExternalDNS
+✅ ExternalDNS IRSA fixed
+✅ ACM wildcard certificate issued
+✅ ALB Controller working
+✅ ALB provisioned
+✅ HTTPS listener configured
+✅ Target Group healthy
+✅ ECR image pushed
+✅ ArgoCD deployed application
+✅ SpringBoot pods running
+✅ DNS resolving correctly
+✅ End-to-end traffic flow working
+
+Now let's finish what a real Platform Engineer would do next.
+
+Current Architecture
+Internet
+    |
+Route53
+    |
+ALB
+    |
+Target Group
+    |
+EKS Service
+    |
+SpringBoot Pods
+Before moving forward
+
+Let's verify the deployment pipeline.
+
+You currently have:
+
+terraform-bootstrap.yaml
+terraform-apply.yaml
+springboot-ci.yaml (empty)
+
+The image was manually built and pushed.
+
+A real platform should do:
+
+Developer Push
+      |
+GitHub Actions
+      |
+Maven Build
+      |
+Docker Build
+      |
+Push to ECR
+      |
+Update GitOps Repo
+      |
+ArgoCD Sync
+      |
+Deploy New Version
+Next Task
+
+Create:
+
+.github/workflows/springboot-ci.yaml
+
+Pipeline stages:
+
+Checkout
+↓
+Java 21
+↓
+mvn package
+↓
+Build Docker Image
+↓
+Login ECR
+↓
+Push Image
+↓
+Update deployment.yaml image tag
+↓
+Commit back to GitOps repo
+Before writing the workflow
+
+Verify GitHub OIDC works.
+
+Run:
+
+aws iam list-attached-role-policies \
+  --role-name platform-github-actions-role
+
+Expected:
+
+AdministratorAccess
+
+If yes:
+
+gh variable list
+
+Show me:
+
+AWS_ROLE_TO_ASSUME
+AWS_REGION
+PROJECT_NAME
+
+Once those are present we'll build the production-grade CI/CD pipeline and remove all manual Docker push operations permanently.
+
+aws iam list-attached-role-policies \
+  --role-name platform-github-actions-role
+{
+    "AttachedPolicies": [
+        {
+            "PolicyName": "AdministratorAccess",
+            "PolicyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        }
+    ]
+}
+kchilak@kalandars-MBP springboot-app % gh variable list
+zsh: command not found: gh
+kchilak@kalandars-MBP springboot-app % git variable list
+git: 'variable' is not a git command. See 'git --help'.
+kchilak@kalandars-MBP springboot-app % github variable list
+zsh: command not found: github
+
+Excellent. Your platform is now actually working end-to-end:
+
+✅ EKS deployed
+✅ ArgoCD deployed
+✅ AWS Load Balancer Controller working
+✅ ExternalDNS working
+✅ ACM certificate issued
+✅ ALB created
+✅ Route53 record created automatically
+✅ SpringBoot pods healthy
+✅ Target group healthy
+✅ HTTPS working
+
+And your application responds:
+
+{
+  "status":"healthy",
+  "service":"platform-demo",
+  "environment":"dev"
+}
+
+The remaining piece is CI/CD.
+
+First install GitHub CLI
+
+You don't have it:
+
+gh
+
+returns command not found.
+
+Install:
+
+brew install gh
+
+Verify:
+
+gh --version
+
+Login:
+
+gh auth login
+
+Choose:
+
+GitHub.com
+HTTPS
+Login with browser
+Check Repository Variables
+
+Once authenticated:
+
+gh variable list
+
+You should see something similar:
+
+AWS_REGION
+AWS_ROLE_TO_ASSUME
+PROJECT_NAME
+
+If empty:
+
+gh variable set AWS_REGION --body us-east-1
+
+gh variable set AWS_ROLE_TO_ASSUME \
+--body arn:aws:iam::136863648867:role/platform-github-actions-role
+
+gh variable set PROJECT_NAME \
+--body kk-platform
+
+Verify:
+
+gh variable list
+Check Repository Secrets
+gh secret list
+
+For OIDC authentication you may not need AWS keys.
+
+If we use:
+
+aws-actions/configure-aws-credentials
+
+with:
+
+role-to-assume:
+
+then GitHub OIDC is sufficient.
+
+Create SpringBoot CI Workflow
+
+Your file is blank:
+
+.github/workflows/springboot-ci.yaml
+
+Let's make it production-grade.
+
+name: SpringBoot CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "springboot-app/**"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: platform-demo
+
+jobs:
+
+  build-and-push:
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: springboot-app
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build Jar
+        run: mvn clean package
+
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t $ECR_REPOSITORY:${{ github.sha }} \
+            .
+
+      - name: Tag Image
+        run: |
+          docker tag \
+          $ECR_REPOSITORY:${{ github.sha }} \
+          ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
+
+      - name: Push Image
+        run: |
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
+
+      - name: Update GitOps Manifest
+        run: |
+          sed -i "s|image: .*|image: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}|g" \
+          ../gitops/manifests/springboot/deployment.yaml
+
+      - name: Commit Manifest
+        run: |
+          git config user.email "github-actions@github.com"
+          git config user.name "github-actions"
+
+          git add ../gitops/manifests/springboot/deployment.yaml
+
+          git commit -m "Update image to ${{ github.sha }}" || true
+
+          git push
+Before running
+
+Verify ECR now contains image:
+
+aws ecr describe-images \
+  --repository-name platform-demo
+
+You should now see at least:
+
+"imageTags": [
+  "1.0.0"
+]
+
+or whatever tag you pushed.
+
+Next step
+
+After you create springboot-ci.yaml, push it to GitHub and run:
+
+git add .
+git commit -m "add springboot ci"
+git push
+
+Then we'll verify:
+
+GitHub OIDC role assumption works
+Image gets pushed to ECR
+Deployment manifest updates automatically
+ArgoCD syncs automatically
+New pod version rolls out without manual kubectl commands
+
+That's the final GitOps flow for this platform.
+
+======== log 30 July ===

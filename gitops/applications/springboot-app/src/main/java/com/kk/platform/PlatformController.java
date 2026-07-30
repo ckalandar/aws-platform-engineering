@@ -16,4 +16,21 @@ public class PlatformController {
                 "environment", "dev",
                 "status", "healthy");
     }
+
+    @GetMapping("/health")
+    public Map<String, String> health() {
+
+        return Map.of(
+                "service", "platform-demo",
+                "environment", "dev",
+                "status", "healthy");
+    }
+
+    @GetMapping("/version")
+    public Map<String, String> version() {
+
+        return Map.of(
+                "version", "v2",
+                "service", "platform-demo");
+    }
 }
