@@ -69,14 +69,14 @@ jobs:
       - name: Update GitOps Manifest
         run: |
           sed -i "s|image: .*|image: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}|g" \
-          ../gitops/manifests/springboot/deployment.yaml
+          gitops/manifests/springboot/deployment.yaml
 
       - name: Commit Manifest
         run: |
           git config user.email "github-actions@github.com"
           git config user.name "github-actions"
 
-          git add ../gitops/manifests/springboot/deployment.yaml
+          git add gitops/manifests/springboot/deployment.yaml
 
           git commit -m "Update image to ${{ github.sha }}" || true
 
