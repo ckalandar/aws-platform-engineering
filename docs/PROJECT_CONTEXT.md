@@ -8724,7 +8724,7 @@ variable "namespace" {
   default = "external-secrets"
 }
 
-variable "service_account_name" {
+variable "service_account_name" { 
   default = "external-secrets"
 }
 outputs.tf
@@ -9102,3 +9102,358 @@ ExternalSecret
 Injecting secrets into SpringBoot
 
 Once that works, we can later refactor and decide whether Terraform should manage the secret metadata resource itself.
+
+Exactly. The evidence is right there:
+
+application.argoproj.io/external-secrets-prereqs created
+application.argoproj.io/external-secrets created
+
+and later:
+
+Resources:
+  Name: external-secrets
+  Status: Synced
+
+  Name: external-secrets-prereqs
+  Status: Synced
+
+So my previous assumption was wrong.
+
+Your App-of-Apps architecture is working correctly and ArgoCD did create both Application CRs.
+
+The real issue is different:
+
+You previously ran:
+
+kubectl get applications -n argocd
+
+and didn't see them.
+
+But now platform-app clearly shows they exist.
+
+So let's verify directly:
+
+kubectl get application external-secrets -n argocd
+
+kubectl get application external-secrets-prereqs -n argocd
+
+If those exist, inspect them:
+
+kubectl describe application external-secrets -n argocd
+
+kubectl describe application external-secrets-prereqs -n argocd
+
+I expect one of two things:
+
+Possibility 1
+
+Application exists but is unhealthy.
+
+Example:
+
+STATUS: Unknown
+STATUS: Missing
+STATUS: Degraded
+Possibility 2
+
+Application exists and synced but Helm chart failed.
+
+Check:
+
+kubectl get events -n argocd --sort-by=.metadata.creationTimestamp
+
+and
+
+kubectl logs \
+-n argocd \
+deploy/argocd-application-controller \
+--tail=200 | grep external-secrets
+
+The important lesson from this debugging session:
+
+Your platform layer is Directory source type, not Kustomize.
+
+We now know ArgoCD behavior in your repo is:
+
+root-app
+  └─ platform-app
+        sourceType: Directory
+        path: gitops/applications/platform
+
+Directory contains Application CRs
+        ↓
+ArgoCD creates child Applications
+        ↓
+Child Applications deploy Helm charts / manifests
+
+That's the model we should use going forward.
+
+Next command I want to see is:
+
+kubectl get application external-secrets -n argocd -o yaml
+
+because platform-app already proved the child Application exists. Now we need to find out why the operator namespace and pods never appeared.
+
+Pasted text(10).txt
+Document
+
+Good. We finally have enough evidence to stop guessing.
+
+Your platform-app successfully created BOTH ArgoCD Applications:
+
+application.argoproj.io/external-secrets-prereqs created
+application.argoproj.io/external-secrets created
+
+So App-of-Apps is working correctly.
+
+The next thing to check is whether those child Applications are healthy.
+
+Run:
+
+kubectl get application external-secrets-prereqs \
+-n argocd
+
+kubectl get application external-secrets \
+-n argocd
+
+Then:
+
+kubectl describe application external-secrets-prereqs \
+-n argocd
+
+and
+
+kubectl describe application external-secrets \
+-n argocd
+
+I want to see:
+
+Health Status
+Sync Status
+Events
+Operation State
+
+because we're now beyond the root app.
+
+Also check whether Argo actually created the namespace:
+
+kubectl get ns external-secrets
+
+If namespace doesn't exist:
+
+kubectl describe application external-secrets -n argocd
+
+will usually show the exact Helm/chart error.
+
+One thing jumps out immediately from your repo structure.
+
+You have:
+
+gitops/manifests/external-secrets
+├── kustomization.yaml
+└── serviceaccount.yaml
+
+but we have not yet verified the ServiceAccount annotation.
+
+Show:
+
+cat gitops/manifests/external-secrets/serviceaccount.yaml
+
+I want to confirm it contains the IRSA role:
+
+annotations:
+  eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-external-secrets
+
+because Terraform created:
+
+kk-platform-dev-external-secrets
+
+and if the ARN in the manifest is wrong, the prereqs app may sync but the operator won't be able to assume the role.
+
+After that run:
+
+kubectl get application external-secrets-prereqs \
+-n argocd -o yaml | grep health -A5
+
+kubectl get application external-secrets \
+-n argocd -o yaml | grep health -A5
+
+Those outputs will tell us exactly where the deployment stopped.
+
+We're very close now—the root app and platform app are already doing their job. The issue is inside one of the two newly-created child applications.
+
+They are healthy and good, lets proceed further kubectl get ns external-secrets
+NAME               STATUS   AGE
+external-secrets   Active   16m
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get application external-secrets-prereqs \
+-n argocd -o yaml | grep health -A5
+
+kubectl get application external-secrets \
+-n argocd -o yaml | grep health -A5
+  health:
+    lastTransitionTime: "2026-07-30T11:05:05Z"
+    status: Healthy
+  history:
+  - deployStartedAt: "2026-07-30T11:05:05Z"
+    deployedAt: "2026-07-30T11:05:05Z"
+  health:
+    lastTransitionTime: "2026-07-30T11:05:53Z"
+    status: Healthy
+  history:
+  - deployStartedAt: "2026-07-30T11:05:06Z"
+    deployedAt: "2026-07-30T11:05:52Z"
+
+Perfect. External Secrets Operator is deployed and healthy.
+
+We can stop validating ArgoCD and start consuming AWS Secrets Manager.
+
+Next objective:
+
+AWS Secrets Manager
+        ↓
+External Secrets Operator
+        ↓
+Kubernetes Secret
+        ↓
+SpringBoot Pod
+Step 1: Verify External Secrets pods
+kubectl get pods -n external-secrets
+
+Expected:
+
+external-secrets-xxxxx       Running
+external-secrets-cert-xxxxx  Running
+external-secrets-webhook     Running
+Step 2: Verify IRSA annotation
+kubectl get sa external-secrets \
+-n external-secrets \
+-o yaml
+
+You should see:
+
+annotations:
+  eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-external-secrets
+
+If present, IRSA is wired correctly.
+
+Step 3: Create SecretStore
+
+Create:
+
+mkdir -p gitops/manifests/external-secrets
+
+Create:
+
+gitops/manifests/external-secrets/secretstore.yaml
+
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+
+metadata:
+  name: aws-secretsmanager
+  namespace: springboot
+
+spec:
+  provider:
+
+    aws:
+      service: SecretsManager
+      region: us-east-1
+
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: external-secrets
+            namespace: external-secrets
+Step 4: Create ExternalSecret
+
+Create:
+
+gitops/manifests/external-secrets/app-config.yaml
+
+apiVersion: external-secrets.io/v1
+
+kind: ExternalSecret
+
+metadata:
+  name: app-config
+  namespace: springboot
+
+spec:
+
+  refreshInterval: 1m
+
+  secretStoreRef:
+    name: aws-secretsmanager
+    kind: SecretStore
+
+  target:
+    name: app-config
+
+  data:
+
+    - secretKey: username
+      remoteRef:
+        key: springboot/dev/app-config
+        property: username
+
+    - secretKey: password
+      remoteRef:
+        key: springboot/dev/app-config
+        property: password
+
+    - secretKey: apiKey
+      remoteRef:
+        key: springboot/dev/app-config
+        property: apiKey
+Step 5: Update kustomization
+
+Show me your current:
+
+cat gitops/manifests/external-secrets/kustomization.yaml
+
+We need to add:
+
+resources:
+  - serviceaccount.yaml
+  - secretstore.yaml
+  - app-config.yaml
+Step 6: Commit
+git add .
+git commit -m "add external secret resources"
+git push
+
+ArgoCD should reconcile automatically.
+
+Step 7: Verify Secret Creation
+
+Wait about 30 seconds.
+
+Then:
+
+kubectl get externalsecret -n springboot
+
+kubectl get secret -n springboot
+
+Expected:
+
+app-config
+
+Then:
+
+kubectl describe externalsecret app-config \
+-n springboot
+
+Status should be:
+
+Ready=True
+
+After that, we'll modify the SpringBoot Deployment so the application receives:
+
+USERNAME
+PASSWORD
+API_KEY
+
+directly from AWS Secrets Manager without hardcoding anything in Kubernetes manifests.
+
+That is the first production-grade secret-management pattern you'll use across EKS workloads.
