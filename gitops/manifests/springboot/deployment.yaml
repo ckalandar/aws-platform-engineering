@@ -20,8 +20,8 @@ spec:
       containers:
         - name: springboot
 
-          image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
-          #image: "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/platform-demo:1.0.0"
+          image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:d8e7d0bae551e2d848a4c3d53c34c27a7090d0b4
+          #image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:d8e7d0bae551e2d848a4c3d53c34c27a7090d0b4
 
           ports:
             - containerPort: 8080
