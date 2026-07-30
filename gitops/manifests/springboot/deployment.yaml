@@ -21,10 +21,28 @@ spec:
         - name: springboot
 
           image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:d8e7d0bae551e2d848a4c3d53c34c27a7090d0b4
-          #image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:d8e7d0bae551e2d848a4c3d53c34c27a7090d0b4
 
           ports:
             - containerPort: 8080
+
+          env:
+            - name: APP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: username
+
+            - name: APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: password
+
+            - name: APP_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-config
+                  key: apiKey
 
           resources:
             requests:

@@ -9457,3 +9457,384 @@ API_KEY
 directly from AWS Secrets Manager without hardcoding anything in Kubernetes manifests.
 
 That is the first production-grade secret-management pattern you'll use across EKS workloads.
+Pasted text(11).txt
+Document
+Pasted text(12).txt
+Document
+I have removed externalsecret.yaml from kustomize.yaml stop complaining about 
+
+
+Perfect. Now we have the actual root cause.
+
+The error is crystal clear:
+
+invalid Auth.JWT.ServiceAccountRef: namespace should either be empty
+or match the namespace of the SecretStore for a namespaced SecretStore
+
+Your current SecretStore:
+
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+
+metadata:
+  name: aws-secretsmanager
+  namespace: springboot
+
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-east-1
+
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: external-secrets
+            namespace: external-secrets
+
+The webhook is rejecting it because:
+
+SecretStore namespace = springboot
+ServiceAccount namespace = external-secrets
+
+A SecretStore is namespaced and can only reference a ServiceAccount in the same namespace.
+
+You have two options.
+
+Option 1 (Recommended)
+
+Use a ClusterSecretStore.
+
+This is what most production EKS platforms do.
+
+Then one AWS Secrets Manager integration can be reused by:
+
+springboot
+nginx
+payments
+orders
+monitoring
+
+without creating a SecretStore in every namespace.
+
+Option 2
+
+Keep SecretStore and create another ServiceAccount in springboot namespace.
+
+Not ideal because you'd duplicate IRSA objects.
+
+For a platform-engineering repo, I'd move to ClusterSecretStore now.
+
+Create:
+
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+
+metadata:
+  name: aws-secretsmanager
+
+spec:
+  provider:
+
+    aws:
+      service: SecretsManager
+      region: us-east-1
+
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: external-secrets
+            namespace: external-secrets
+
+Notice:
+
+kind: ClusterSecretStore
+
+instead of:
+
+kind: SecretStore
+
+Then update app-config.yaml:
+
+secretStoreRef:
+  name: aws-secretsmanager
+  kind: ClusterSecretStore
+
+instead of:
+
+secretStoreRef:
+  name: aws-secretsmanager
+  kind: SecretStore
+
+This fits your architecture much better:
+
+AWS Secrets Manager
+        │
+        ▼
+ClusterSecretStore
+        │
+        ▼
+External Secrets Operator
+        │
+ ┌──────┼──────┐
+ ▼      ▼      ▼
+springboot nginx monitoring
+
+which is how a shared platform team would build it.
+
+So update:
+
+gitops/manifests/external-secrets/secretstore.yaml
+
+from:
+
+kind: SecretStore
+
+to:
+
+kind: ClusterSecretStore
+
+and update:
+
+gitops/manifests/external-secrets/app-config.yaml
+
+from:
+
+kind: SecretStore
+
+to:
+
+kind: ClusterSecretStore
+
+Commit, push, wait for ArgoCD sync, then check:
+
+kubectl get clustersecretstore
+
+Expected:
+
+aws-secretsmanager   Valid
+
+After that we'll verify IRSA is working and the Kubernetes Secret gets created.
+
+kubectl get clustersecretstore
+NAME                 AGE     STATUS   CAPABILITIES   READY
+aws-secretsmanager   9m10s   Valid    ReadWrite      True
+
+Excellent. That means:
+
+✅ External Secrets Operator installed
+
+✅ IRSA working enough for validation
+
+✅ ClusterSecretStore created
+
+✅ ClusterSecretStore validated by ESO
+
+✅ ArgoCD successfully applied the resource
+
+We've moved past the SecretStore problem.
+
+Now check whether ESO has synced the secret:
+
+kubectl get externalsecret -n springboot
+
+Then:
+
+kubectl describe externalsecret app-config -n springboot
+
+Pay attention to:
+
+Status:
+Conditions:
+Ready:
+Message:
+
+If Ready=True, verify the Kubernetes Secret:
+
+kubectl get secret app-config -n springboot
+
+Then:
+
+kubectl get secret app-config \
+-n springboot \
+-o jsonpath='{.data.username}' | base64 -d
+
+echo
+
+and
+
+kubectl get secret app-config \
+-n springboot \
+-o jsonpath='{.data.password}' | base64 -d
+
+echo
+
+Expected:
+
+admin
+SuperSecret123
+
+If the ExternalSecret still shows an error, paste:
+
+kubectl describe externalsecret app-config -n springboot
+
+and we'll troubleshoot the IRSA/AWS permissions layer next. This is the stage where ESO actually attempts:
+
+Pod
+  ↓
+IRSA
+  ↓
+STS AssumeRoleWithWebIdentity
+  ↓
+Secrets Manager
+  ↓
+Kubernetes Secret
+
+and we'll verify each hop.
+
+kubectl get clustersecretstore
+NAME                 AGE     STATUS   CAPABILITIES   READY
+aws-secretsmanager   9m10s   Valid    ReadWrite      True
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get externalsecret -n springboot
+NAME         STORETYPE            STORE                REFRESH INTERVAL   STATUS         READY
+app-config   ClusterSecretStore   aws-secretsmanager   1m                 SecretSynced   True
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get secret app-config -n springboot
+NAME         TYPE     DATA   AGE
+app-config   Opaque   3      7m21s
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get secret app-config \
+-n springboot \
+-o jsonpath='{.data.username}' | base64 -d
+
+echo
+admin
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get secret app-config \
+-n springboot \
+-o jsonpath='{.data.password}' | base64 -d
+
+echo
+SuperSecret123
+
+Perfect. We've completed the full External Secrets flow.
+
+You now have:
+
+AWS Secrets Manager
+        ↓
+ClusterSecretStore
+        ↓
+External Secrets Operator
+        ↓
+ExternalSecret
+        ↓
+Kubernetes Secret
+        ↓
+SpringBoot Namespace
+
+Verification:
+
+ClusterSecretStore     READY=True
+ExternalSecret         READY=True
+Kubernetes Secret      Created
+username               admin
+password               SuperSecret123
+
+This is a major platform capability. Most EKS environments stop at GitOps + ArgoCD. You've now added:
+
+IRSA
+AWS Secrets Manager
+External Secrets Operator
+ArgoCD-managed secret synchronization
+
+which is exactly how production EKS platforms typically handle application secrets.
+
+Next thing to build
+
+I would not jump to observability yet.
+
+The highest-value next step is:
+
+SpringBoot Application
+       ↓
+Consumes Kubernetes Secret
+       ↓
+Environment Variables
+       ↓
+Application uses secret
+
+Right now the secret exists in Kubernetes, but your application isn't using it.
+
+A platform engineer's job isn't just getting the secret into the cluster—the workload must consume it.
+
+Update your SpringBoot deployment.
+
+Current deployment likely has:
+
+containers:
+  - name: springboot
+
+Add:
+
+env:
+  - name: APP_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: app-config
+        key: username
+
+  - name: APP_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: app-config
+        key: password
+
+  - name: APP_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: app-config
+        key: apiKey
+
+in:
+
+gitops/manifests/springboot/deployment.yaml
+
+Then update your controller:
+
+@Value("${APP_USERNAME:unknown}")
+private String username;
+
+@GetMapping("/config")
+public Map<String, String> config() {
+
+    return Map.of(
+        "username", username,
+        "service", "platform-demo"
+    );
+}
+
+or use System.getenv() if you prefer.
+
+What you'll learn next:
+
+AWS Secrets Manager
+        ↓
+External Secrets
+        ↓
+Kubernetes Secret
+        ↓
+Pod Environment Variable
+        ↓
+SpringBoot Runtime
+
+This completes the entire secret management lifecycle.
+
+After that, I would move directly into observability:
+
+Prometheus
+Grafana
+Loki
+Alertmanager
+Ingress
+ArgoCD-managed deployment
+SpringBoot metrics
+
+because once secrets are working end-to-end, observability gives the biggest increase in platform maturity.
