@@ -11992,3 +11992,1024 @@ Logs     -> Loki
 Traces   -> Tempo
 
 and Grafana can correlate all three from a single dashboard. That's where the platform starts feeling like an enterprise observability solution rather than a collection of tools.
+
+Pasted text(14).txt
+Document
+
+Good progress. We have now isolated the problem.
+
+What we know
+
+✅ Alloy pods are running
+
+✅ /var/log/containers exists inside the Alloy pod
+
+✅ Loki is running
+
+✅ Grafana can reach Loki
+
+✅ Alloy configuration syntax is fixed
+
+❌ Logs still aren't showing in Loki
+
+The next step is to verify whether Alloy is actually reading files and pushing them to Loki.
+
+Run:
+
+kubectl logs -n alloy alloy-5fw2z -c alloy --tail=200
+
+Look for messages containing:
+
+loki.write
+loki.source.file
+tailing
+reading file
+push
+batch
+error
+
+Also check Alloy metrics:
+
+kubectl port-forward -n alloy pod/alloy-5fw2z 12345:12345
+
+In another terminal:
+
+curl localhost:12345/metrics | grep loki
+
+and
+
+curl localhost:12345/metrics | grep file
+
+We should see counters such as:
+
+loki_write_sent_entries_total
+loki_source_file_read_lines_total
+
+If those remain zero, Alloy isn't processing files.
+
+I suspect one more issue
+
+Your current config:
+
+local.file_match "pods" {
+  path_targets = [
+    {
+      __path__ = "/var/log/containers/*.log",
+    },
+  ]
+}
+
+loki.source.file "pods" {
+  targets    = local.file_match.pods.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+reads logs but does not attach useful labels.
+
+Try querying in Grafana:
+
+{job=~".*"}
+
+or
+
+{}
+
+If logs arrive without labels, {namespace="argocd"} won't return anything.
+
+Verify directly from Loki
+
+Run:
+
+kubectl exec -n loki loki-0 -- \
+wget -qO- "http://localhost:3100/loki/api/v1/labels"
+
+You should get something like:
+
+{
+  "status":"success",
+  "data":[ ... labels ... ]
+}
+
+If data is empty:
+
+"data":[]
+
+then Alloy is not sending anything to Loki.
+
+Most likely root cause
+
+Looking at your DaemonSet earlier, initially it had:
+
+volumeMounts:
+- mountPath: /etc/alloy
+
+only.
+
+After you updated the Helm values, we verified /var/log/containers exists, which means hostPath mounts are now present.
+
+The remaining question is:
+
+Is Alloy discovering files?
+
+Run:
+
+kubectl logs -n alloy alloy-5fw2z -c alloy --tail=200
+
+and paste the output.
+
+That log will tell us immediately whether:
+
+Alloy isn't matching files
+Alloy is matching files but failing to push
+Alloy is successfully pushing and the issue is labels/querying
+
+Once logs are flowing, we'll move to the next platform milestone:
+
+Tempo → OpenTelemetry Collector → Distributed Tracing → Java application instrumentation, which is where the observability stack starts becoming production-grade.
+
+Pasted text(15).txt
+Document
+
+Good progress. We've now found the real issue.
+
+What we know
+
+Your Alloy pods are now healthy:
+
+alloy-5fw2z   2/2 Running
+
+And inside the pod:
+
+kubectl exec -n alloy alloy-5fw2z -- ls /var/log/containers
+
+shows container logs correctly.
+
+That means:
+
+✅ Alloy configuration parses successfully
+✅ Host log directory is mounted correctly
+✅ Alloy can see Kubernetes container logs
+✅ Loki is running
+✅ Grafana can reach Loki
+
+Next step: verify logs are actually reaching Loki
+
+Run:
+
+kubectl logs -n alloy alloy-5fw2z -c alloy --tail=100
+
+Look for messages like:
+
+level=info component=loki.source.file
+level=info component=loki.write
+
+or errors like:
+
+connection refused
+push failed
+Check what labels Loki is receiving
+
+Port-forward Loki:
+
+kubectl port-forward -n loki svc/loki 3100:3100
+
+Then in another terminal:
+
+curl -G http://localhost:3100/loki/api/v1/labels
+
+and
+
+curl -G http://localhost:3100/loki/api/v1/label/job/values
+
+If logs are arriving, you'll see labels returned.
+
+Most likely remaining problem
+
+Your Alloy config is currently:
+
+local.file_match "pods" {
+  path_targets = [
+    {
+      __path__ = "/var/log/containers/*.log",
+    },
+  ]
+}
+
+loki.source.file "pods" {
+  targets    = local.file_match.pods.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+This ships raw files but doesn't attach Kubernetes metadata.
+
+Therefore queries like:
+
+{namespace="argocd"}
+
+return nothing because no namespace label exists.
+
+Test with "everything"
+
+In Grafana Explore run:
+
+{}
+
+or
+
+{filename=~".*"}
+
+If logs appear, Loki ingestion is working and only labels are missing.
+
+Production-grade Alloy configuration
+
+The next thing we should do is replace the current minimal config with a Kubernetes-aware Alloy config that:
+
+Discovers pods automatically
+Adds labels:
+namespace
+pod
+container
+node
+app
+Sends logs to Loki
+
+Then queries such as:
+
+{namespace="argocd"}
+{namespace="springboot"}
+{container="springboot"}
+
+will work.
+
+Run these two commands and share the outputs:
+
+kubectl logs -n alloy alloy-5fw2z -c alloy --tail=100
+curl -G http://localhost:3100/loki/api/v1/labels
+
+Once we see those, we'll build the proper Kubernetes discovery Alloy configuration and then move on to:
+
+OpenTelemetry Collector
+Tempo
+Distributed Tracing
+Java App Instrumentation
+Karpenter
+CI/CD Pipeline
+Istio
+Backstage
+Crossplane
+Enterprise IDP
+
+which is the path toward a production-grade platform engineering stack.
+
+I used this and I am able to see the logs {filename="/var/log/containers/alertmanager-monitoring-kube-prometheus-alertmanager-0_monitoring_alertmanager-bd1b88171f20616dd560ccfbfb915976c1152f08485b4eef3df78f2c041c3b50.log"}
+
+/var/log/containers/alertmanager-monitoring-kube-prometheus-alertmanager-0_monitoring_alertmanager-bd1b88171f20616dd560ccfbfb915976c1152f08485b4eef3df78f2c041c3b50.log
+
+Excellent. This tells us exactly where we are.
+
+Your screenshot shows Loki is working and Alloy is successfully shipping logs.
+
+The proof is:
+
+{filename="/var/log/containers/alertmanager-....log"}
+
+returns logs.
+
+And the labels visible are:
+
+filename
+detected_level
+service_name
+
+but not:
+
+namespace
+pod
+container
+node
+app
+What this means
+
+Current state:
+
+Container Logs
+        ↓
+Alloy
+        ↓
+Loki
+        ↓
+Grafana
+
+✅ Working
+
+But Alloy is only reading files.
+
+It is not performing Kubernetes discovery and metadata enrichment.
+
+Therefore queries such as:
+
+{namespace="monitoring"}
+{namespace="argocd"}
+{pod="springboot-xxxxx"}
+
+will never work.
+
+Why this happened
+
+Your current config:
+
+local.file_match "pods" {
+  path_targets = [
+    {
+      __path__ = "/var/log/containers/*.log",
+    },
+  ]
+}
+
+loki.source.file "pods" {
+  targets = local.file_match.pods.targets
+}
+
+reads files only.
+
+The filename contains:
+
+alertmanager-monitoring-kube-prometheus-alertmanager-0_monitoring_alertmanager.log
+
+but Alloy does not automatically extract:
+
+namespace=monitoring
+pod=alertmanager-monitoring-kube-prometheus-alertmanager-0
+container=alertmanager
+This is actually good news
+
+We have validated:
+
+✅ Loki deployed
+
+✅ Grafana datasource works
+
+✅ Alloy deployed
+
+✅ HostPath mount works
+
+✅ Logs are reaching Loki
+
+This completes the "centralized logging" milestone.
+
+What I would do next
+
+Instead of spending another hour perfecting labels right now, move forward with the platform roadmap.
+
+Current stack:
+
+EKS
+ArgoCD
+External Secrets
+External DNS
+ALB Controller
+Prometheus
+Grafana
+Loki
+Alloy
+
+This is already a solid observability foundation.
+
+Next Logical Step
+
+I recommend:
+
+Step 1: OpenTelemetry Collector
+
+Add:
+
+Application Metrics
+Application Logs
+Application Traces
+
+pipeline.
+
+Architecture:
+
+Spring Boot
+      ↓
+OpenTelemetry SDK
+      ↓
+OTEL Collector
+      ↓
+Prometheus
+      ↓
+Loki
+      ↓
+Tempo
+Step 2: Tempo
+
+Distributed tracing.
+
+Then you can trace:
+
+User Request
+      ↓
+ALB
+      ↓
+Spring Boot
+      ↓
+Database
+
+inside Grafana.
+
+Step 3: Instrument Spring Boot
+
+Add:
+
+opentelemetry-javaagent.jar
+
+and start generating traces.
+
+Step 4: Karpenter
+
+Right now you manually resized nodes:
+
+t3.medium → t3.large
+
+Karpenter should do that automatically.
+
+That is the next major platform engineering milestone.
+
+Recommendation
+
+Don't stop to perfect Alloy labels right now.
+
+You have already proven:
+
+Logs → Loki → Grafana
+
+works.
+
+Let's proceed to:
+
+OpenTelemetry Collector
+        ↓
+Tempo
+        ↓
+Java Auto Instrumentation
+        ↓
+Distributed Tracing
+        ↓
+Karpenter
+
+This is where the platform starts looking like a real production-grade observability stack rather than just log aggregation.
+
+Perfect. Now we move from Monitoring + Logging into Observability.
+
+What we have today:
+
+EKS
+ ├── Prometheus
+ ├── Grafana
+ ├── Loki
+ ├── Alloy
+ ├── ArgoCD
+ └── Spring Boot App
+
+Current visibility:
+
+Metrics  ✅
+Logs     ✅
+Traces   ❌
+
+Our next objective:
+
+Metrics  → Prometheus
+Logs     → Loki
+Traces   → Tempo
+
+This is the foundation of a modern platform.
+
+Target Architecture
+                    ┌─────────────┐
+                    │ Spring Boot │
+                    └──────┬──────┘
+                           │
+                           │ OTLP
+                           ▼
+                 ┌──────────────────┐
+                 │ OTEL Collector   │
+                 └──────┬───────────┘
+                        │
+      ┌─────────────────┼────────────────┐
+      │                 │                │
+      ▼                 ▼                ▼
+
+ Prometheus         Loki            Tempo
+ (Metrics)         (Logs)          (Traces)
+
+      └───────────── Grafana ────────────┘
+Why OTEL Collector?
+
+Many beginners send data directly:
+
+App → Prometheus
+App → Loki
+App → Tempo
+
+Bad idea.
+
+Production platforms use:
+
+App → OTEL Collector → Backend
+
+Benefits:
+
+buffering
+retries
+batching
+sampling
+vendor-neutral
+one configuration point
+
+This is the CNCF standard.
+
+GitOps Structure
+
+We'll add:
+
+gitops/
+├── applications/
+│   └── platform/
+│       ├── otel-collector.yaml
+│       └── tempo.yaml
+
+├── values/
+│   ├── otel-collector/
+│   │   └── dev.yaml
+│   └── tempo/
+│       └── dev.yaml
+Step 1 — Deploy Tempo
+
+Create:
+
+gitops/applications/platform/tempo.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: tempo
+  namespace: argocd
+
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tempo
+
+  sources:
+
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: tempo
+      targetRevision: 1.23.2
+
+      helm:
+        valueFiles:
+          - $values/gitops/values/tempo/dev.yaml
+
+    - repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+      targetRevision: main
+      ref: values
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
+Tempo Values
+
+Create:
+
+gitops/values/tempo/dev.yaml
+tempo:
+
+  retention: 24h
+
+persistence:
+  enabled: true
+
+  storageClassName: gp3
+
+  size: 10Gi
+
+service:
+  type: ClusterIP
+
+Commit:
+
+git add .
+git commit -m "add tempo"
+git push
+
+Wait for ArgoCD sync.
+
+Verify:
+
+kubectl get pods -n tempo
+
+Expected:
+
+tempo-0    Running
+Step 2 — Add Tempo Datasource
+
+Extend Grafana datasource configuration.
+
+In:
+
+gitops/values/monitoring/dev.yaml
+
+add:
+
+grafana:
+
+  additionalDataSources:
+
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki.loki.svc.cluster.local:3100
+
+    - name: Tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.tempo.svc.cluster.local:3100
+
+Commit.
+
+Sync.
+
+Verify:
+
+Grafana
+ → Connections
+ → Data Sources
+
+You should see:
+
+Prometheus
+Loki
+Tempo
+Step 3 — Deploy OpenTelemetry Collector
+
+Create:
+
+gitops/applications/platform/otel-collector.yaml
+
+Using the official chart:
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: otel-collector
+  namespace: argocd
+
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+
+  sources:
+
+    - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+      chart: opentelemetry-collector
+      targetRevision: 0.128.0
+
+      helm:
+        valueFiles:
+          - $values/gitops/values/otel-collector/dev.yaml
+
+    - repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+      targetRevision: main
+      ref: values
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
+OTEL Collector Values
+
+Create:
+
+gitops/values/otel-collector/dev.yaml
+mode: deployment
+
+config:
+
+  receivers:
+
+    otlp:
+      protocols:
+        grpc:
+        http:
+
+  processors:
+
+    batch:
+
+  exporters:
+
+    debug:
+
+    otlp:
+      endpoint: tempo.tempo.svc.cluster.local:4317
+      tls:
+        insecure: true
+
+  service:
+
+    pipelines:
+
+      traces:
+        receivers:
+          - otlp
+
+        processors:
+          - batch
+
+        exporters:
+          - debug
+          - otlp
+
+This means:
+
+Spring Boot
+      ↓
+OTEL Collector
+      ↓
+Tempo
+Verify Collector
+
+After sync:
+
+kubectl get pods -n observability
+
+Expected:
+
+otel-collector-xxxxx Running
+Where We Go Next
+
+After Tempo and OTEL Collector are healthy, we will:
+
+Phase 2
+
+Instrument Spring Boot
+
+Java Agent
+      ↓
+OTEL Collector
+      ↓
+Tempo
+
+Generate traces automatically.
+
+Then in Grafana:
+
+Explore
+  ├── Prometheus
+  ├── Loki
+  └── Tempo
+
+You'll be able to click a trace and follow a request end-to-end.
+
+For now, implement Tempo first, sync it, and show me:
+
+kubectl get pods -n tempo
+kubectl get svc -n tempo
+
+Then we'll wire the OTEL Collector correctly against the actual Tempo service endpoints created by the chart.
+
+kubectl get pods -n tempo
+kubectl get svc -n tempo
+NAME      READY   STATUS    RESTARTS   AGE
+tempo-0   1/1     Running   0          13m
+NAME    TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                                                                   AGE
+tempo   ClusterIP   172.20.138.215   <none>        6831/UDP,6832/UDP,3200/TCP,14268/TCP,14250/TCP,9411/TCP,55680/TCP,55681/TCP,4317/TCP,4318/TCP,55678/TCP   13m
+
+Excellent. Tempo is running and exposing the OTLP endpoints:
+
+tempo.tempo.svc.cluster.local:4317   # OTLP gRPC
+tempo.tempo.svc.cluster.local:4318   # OTLP HTTP
+
+At this point your observability stack looks like this:
+
+Spring Boot App
+    |
+    +--> Prometheus Metrics
+    |         |
+    |         v
+    |    Prometheus
+    |         |
+    |         v
+    |      Grafana
+    |
+    +--> Application Logs
+    |         |
+    |         v
+    |       Alloy
+    |         |
+    |         v
+    |       Loki
+    |         |
+    |         v
+    |      Grafana
+    |
+    +--> Distributed Traces
+              |
+              v
+      OpenTelemetry SDK
+              |
+              v
+           Tempo
+              |
+              v
+           Grafana
+
+You now have Metrics + Logs.
+
+Next: Traces.
+
+Step 1: Add Tempo datasource to Grafana
+
+Add to your monitoring values.
+
+grafana:
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki.loki.svc.cluster.local:3100
+
+    - name: Tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.tempo.svc.cluster.local:3200
+
+Commit:
+
+git add .
+git commit -m "Add Tempo datasource"
+git push
+
+Wait for ArgoCD sync.
+
+Verify:
+
+kubectl logs -n monitoring deploy/monitoring-grafana
+
+Then check:
+
+Grafana
+  Connections
+    Data Sources
+
+You should see:
+
+Prometheus
+Loki
+Tempo
+Alertmanager
+Step 2: Instrument Spring Boot
+
+What Spring Boot version are you running?
+
+Check:
+
+cat pom.xml | grep spring-boot
+
+If you're using Spring Boot 3.x (most likely), add:
+
+<dependency>
+    <groupId>io.opentelemetry.instrumentation</groupId>
+    <artifactId>opentelemetry-spring-boot-starter</artifactId>
+    <version>2.15.0</version>
+</dependency>
+Step 3: Configure OTLP Export
+
+Add to:
+
+application.yaml
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
+otel:
+  exporter:
+    otlp:
+      endpoint: http://tempo.tempo.svc.cluster.local:4318
+
+  traces:
+    exporter: otlp
+
+This exports every request trace to Tempo.
+
+Step 4: Verify Connectivity
+
+Enter Spring Boot pod:
+
+kubectl exec -it \
+springboot-xxxxx \
+-n springboot -- sh
+
+Test:
+
+curl http://tempo.tempo.svc.cluster.local:3200/ready
+
+Expected:
+
+ready
+Step 5: Generate Traffic
+
+Open:
+
+https://springboot.dev.learnsystems.co
+
+or
+
+for i in {1..100}; do
+  curl https://springboot.dev.learnsystems.co
+done
+Step 6: Verify Tempo Receives Traces
+
+Check Tempo logs:
+
+kubectl logs -n tempo tempo-0
+
+You should start seeing:
+
+received spans
+ingested traces
+Step 7: Query Traces in Grafana
+
+Go to:
+
+Explore
+
+Select:
+
+Tempo
+
+Query:
+
+{}
+
+or
+
+service.name="springboot"
+
+You should start seeing trace IDs.
+
+Step 8: Correlate Metrics ↔ Logs ↔ Traces
+
+This is where observability becomes powerful.
+
+A request flow becomes:
+
+HTTP Request
+      |
+      v
+Trace (Tempo)
+      |
+      +--> Logs (Loki)
+      |
+      +--> Metrics (Prometheus)
+
+From a trace you can jump to logs.
+
+From logs you can jump to traces.
+
+From metrics you can jump to traces.
+
+Exactly what platform teams run in production.
+
+What I'd do next
+
+Once Tempo datasource appears in Grafana and traces are visible, the next production-grade step is:
+
+Auto-instrument Spring Boot with OpenTelemetry
+Add service maps
+Add exemplars (Prometheus ↔ Tempo linking)
+Build RED dashboards
+Rate
+Errors
+Duration
+Create SLOs
+Alerting via Alertmanager
+Add a second microservice and visualize distributed traces across services
+
+That gets you very close to a real enterprise observability platform running on EKS.
