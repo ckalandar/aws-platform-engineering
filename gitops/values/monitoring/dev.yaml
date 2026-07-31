@@ -16,7 +16,13 @@ grafana:
 
     hosts:
       - grafana.dev.learnsystems.co
+  #additionalDataSources:
 
+  #  - name: Loki
+  #    type: loki
+  #    access: proxy
+  #    url: http://loki-gateway.loki.svc.cluster.local
+  #    isDefault: false
 prometheus:
   prometheusSpec:
 

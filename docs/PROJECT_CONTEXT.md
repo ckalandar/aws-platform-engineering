@@ -10340,3 +10340,498 @@ kubectl describe application monitoring -n argocd
 cat gitops/applications/platform/monitoring.yaml
 
 Those will tell us exactly whether we're dealing with an ArgoCD sync issue or a Helm rendering issue.
+
+======== log 31july ======
+
+there is no cat infrastructure/modules/platform/main.tf, I have attached the module repo structure
+
+Excellent. This is the signal we were waiting for.
+
+✅ EBS CSI is now healthy
+ebs-csi-controller ... 6/6 Running
+ebs-csi-controller ... 6/6 Running
+ebs-csi-node       ... 3/3 Running
+ebs-csi-node       ... 3/3 Running
+
+This means:
+
+IRSA role is working
+EBS CSI addon is working
+EBS CSI controller can talk to AWS APIs
+StorageClass gp3 is managed by Terraform
+Terraform state and cluster state are aligned
+Next verification
+
+Now check if the PVCs got provisioned:
+
+kubectl get pvc -n monitoring
+
+Expected:
+
+STATUS   Bound
+
+instead of Pending.
+
+Then check Prometheus
+kubectl get pods -n monitoring
+
+Expected:
+
+prometheus-monitoring-kube-prometheus-prometheus-0      Running
+alertmanager-monitoring-kube-prometheus-alertmanager-0  Running
+If PVCs are still Pending
+
+Describe one PVC:
+
+kubectl describe pvc \
+prometheus-monitoring-kube-prometheus-prometheus-db-prometheus-monitoring-kube-prometheus-prometheus-0 \
+-n monitoring
+
+The event section will tell us exactly what's happening.
+
+Repository status
+
+At this point your Terraform platform should contain:
+
+EKS
+modules/eks/
+├── main.tf
+├── addons.tf
+├── oidc.tf
+├── ebs-csi.tf
+├── storageclass.tf
+├── outputs.tf
+└── variables.tf
+Managed by Terraform
+
+✅ EKS Cluster
+✅ Node Groups
+✅ OIDC Provider
+✅ EBS CSI IRSA
+✅ EBS CSI Addon
+✅ Default gp3 StorageClass
+
+This is the correct production-grade approach.
+
+One thing I would add next
+
+For the platform roadmap, before we move further into GitOps apps:
+
+EFS CSI Driver
+
+Prometheus uses EBS (good).
+
+But later you'll likely deploy:
+
+Grafana dashboards
+Jenkins
+SonarQube
+Nexus
+Shared application storage
+
+Those typically benefit from:
+
+ReadWriteMany (RWX)
+
+which EBS cannot provide.
+
+So the next platform storage layer should be:
+
+modules/eks/
+├── ebs-csi.tf
+├── efs-csi.tf
+├── storageclass-gp3.tf
+└── storageclass-efs.tf
+
+Not required today, but part of the platform baseline.
+
+Now run:
+
+kubectl get pvc -n monitoring
+kubectl get pods -n monitoring
+
+and let's confirm Prometheus and Alertmanager have successfully attached EBS volumes.
+
+kubectl get pvc -n monitoring
+NAME                                                                                                             STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+alertmanager-monitoring-kube-prometheus-alertmanager-db-alertmanager-monitoring-kube-prometheus-alertmanager-0   Bound    pvc-d7f06425-b79e-404a-af28-276f0ecc0b11   5Gi        RWO            gp3            <unset>                 3h58m
+prometheus-monitoring-kube-prometheus-prometheus-db-prometheus-monitoring-kube-prometheus-prometheus-0           Bound    pvc-a8183314-af9c-42ff-b348-5b99ea1c042f   20Gi       RWO            gp3            <unset>                 3h58m
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get pods -n monitoring
+NAME                                                     READY   STATUS    RESTARTS   AGE
+alertmanager-monitoring-kube-prometheus-alertmanager-0   2/2     Running   0          4h12m
+monitoring-grafana-6cd9bdb8b-8x6mr                       3/3     Running   0          22h
+monitoring-kube-prometheus-operator-796cdc678d-2ghjz     1/1     Running   0          4h12m
+monitoring-kube-state-metrics-7fc7c7469d-lxmn5           1/1     Running   0          22h
+monitoring-prometheus-node-exporter-fczln                1/1     Running   0          22h
+monitoring-prometheus-node-exporter-qcqc7                1/1     Running   0          22h
+prometheus-monitoring-kube-prometheus-prometheus-0       2/2     Running   0          4h12m
+
+Excellent. We have now fully resolved the original issue.
+
+What happened
+
+Initially:
+
+Prometheus PVC -> Pending
+Alertmanager PVC -> Pending
+
+Root cause:
+
+Prometheus
+   ↓
+PVC
+   ↓
+StorageClass gp3
+   ↓
+EBS CSI Driver
+   ↓
+AWS EBS Volume
+
+
+The EBS CSI driver was failing because it had no valid AWS credentials:
+
+Failed health check
+no EC2 IMDS role found
+
+which meant:
+
+PVC -> Pending
+PV  -> Not Created
+Pod -> Pending
+What fixed it
+
+We implemented the platform correctly through Terraform:
+
+EKS OIDC
+aws_iam_openid_connect_provider.eks
+EBS CSI IRSA Role
+aws_iam_role.ebs_csi
+EBS CSI Policy
+AmazonEBSCSIDriverPolicy
+EKS Addon
+aws_eks_addon.ebs_csi
+Default StorageClass
+kubernetes_storage_class.gp3
+Current healthy state
+Storage
+alertmanager PVC -> Bound
+prometheus PVC   -> Bound
+Volumes
+5Gi  GP3 EBS
+20Gi GP3 EBS
+Monitoring
+Prometheus   Running
+Alertmanager Running
+Grafana      Running
+Operator     Running
+NodeExporter Running
+CSI
+Controller 6/6 Running
+Controller 6/6 Running
+Node       3/3 Running
+Node       3/3 Running
+Architecture review
+
+If I were reviewing this platform as a senior platform architect, I would now consider the monitoring stack production-capable for a small environment.
+
+You now have:
+
+AWS
+└── EKS
+    ├── ALB Controller
+    ├── External DNS
+    ├── External Secrets
+    ├── EBS CSI
+    ├── ArgoCD
+    └── kube-prometheus-stack
+         ├── Prometheus
+         ├── Alertmanager
+         ├── Grafana
+         ├── Node Exporter
+         └── Kube State Metrics
+Lessons learned for this repository
+
+This is the important part.
+
+When introducing a platform component, think through all dependencies before deployment.
+
+For example:
+
+Monitoring
+
+Not just:
+
+Install Prometheus
+
+But:
+
+Prometheus
+ ├─ PVC
+ ├─ StorageClass
+ ├─ CSI Driver
+ ├─ IAM Permissions
+ ├─ IRSA
+ ├─ Persistent Volumes
+ ├─ Backup Strategy
+ └─ Retention Policy
+ALB Controller
+
+Not just:
+
+helm install aws-load-balancer-controller
+
+But:
+
+ALB Controller
+ ├─ OIDC
+ ├─ IRSA
+ ├─ IAM Policy
+ ├─ Subnet Tags
+ ├─ Security Groups
+ └─ IngressClass
+External DNS
+External DNS
+ ├─ Route53
+ ├─ Hosted Zone
+ ├─ IRSA
+ ├─ IAM Policy
+ └─ DNS Ownership
+
+This is the mindset that differentiates a platform engineer from someone who just installs Helm charts.
+
+What I would do next
+
+Before pushing further application workloads, I would add:
+
+Storage Layer
+modules/eks/
+├── ebs-csi.tf
+├── efs-csi.tf
+├── storageclass-gp3.tf
+└── storageclass-efs.tf
+Observability Layer
+
+Add ArgoCD-managed:
+
+gitops/apps/
+├── monitoring/
+├── loki/
+├── tempo/
+└── opentelemetry/
+
+so the platform provides:
+
+Metrics  -> Prometheus
+Logs     -> Loki
+Traces   -> Tempo
+Telemetry-> OpenTelemetry
+
+This becomes a proper Internal Developer Platform foundation.
+
+For now, I would:
+
+Commit the EBS CSI Terraform changes.
+Commit the StorageClass Terraform resource.
+Run terraform plan one final time and ensure 0 changes.
+Push to Git.
+Continue with the next GitOps application.
+
+The monitoring stack is healthy and the storage problem is resolved.
+
+done above all .. lets proceed
+
+Great. Before we rush into the next component, let's take stock of what your platform actually has now.
+
+Current Platform State
+Infrastructure (Terraform)
+
+✅ VPC
+
+✅ Public / Private App / Private DB subnets
+
+✅ NAT Gateway
+
+✅ Security Groups
+
+✅ EKS Cluster
+
+✅ Managed Node Groups
+
+✅ OIDC Provider
+
+✅ ECR
+
+EKS Platform Services
+
+✅ AWS Load Balancer Controller
+
+✅ External DNS
+
+✅ External Secrets
+
+✅ EBS CSI Driver
+
+✅ GP3 StorageClass
+
+GitOps
+
+✅ ArgoCD
+
+✅ Root App
+
+✅ App-of-Apps pattern
+
+Observability
+
+✅ Prometheus
+
+✅ Alertmanager
+
+✅ Grafana
+
+✅ Node Exporter
+
+✅ Kube State Metrics
+
+Storage
+
+✅ EBS CSI
+
+✅ Persistent Volumes
+
+✅ Persistent Claims
+
+What should come next?
+
+If I were designing this as a real enterprise Internal Developer Platform, I'd prioritize:
+
+Phase 1 — Complete Platform Foundation
+1. EFS CSI Driver
+
+Add shared storage support.
+
+Needed later for:
+
+Jenkins
+SonarQube
+Nexus
+Shared application data
+RWX workloads
+
+Current limitation:
+
+EBS = ReadWriteOnce
+
+Future:
+
+EFS = ReadWriteMany
+2. Cluster Autoscaler / Karpenter
+
+You previously mentioned Karpenter experience.
+
+Right now:
+
+NodeGroup
+  min = 2
+  desired = 2
+  max = 4
+
+This is fine for learning.
+
+A production platform should move to:
+
+Karpenter
+
+Benefits:
+
+Faster scale-out
+Spot instances
+Cost optimization
+Mixed instance families
+3. Logging Platform
+
+You currently have metrics.
+
+You do not have logs.
+
+Add:
+
+Loki
+
+and connect Grafana.
+
+Architecture:
+
+Pods
+  ↓
+Promtail
+  ↓
+Loki
+  ↓
+Grafana
+4. Tracing
+
+Add:
+
+Tempo
+
+and later:
+
+OpenTelemetry Collector
+
+Architecture:
+
+Application
+  ↓
+OTEL SDK
+  ↓
+OTEL Collector
+  ↓
+Tempo
+My recommendation
+
+Do not jump to Jenkins, SonarQube, Backstage, Crossplane, IDP features yet.
+
+Your platform is missing:
+
+Metrics  ✅
+Logs     ❌
+Traces   ❌
+
+A modern platform needs all three.
+
+Suggested Next Milestone
+
+I would implement:
+
+gitops/apps/observability/
+├── prometheus/
+├── loki/
+├── tempo/
+└── otel-collector/
+
+This gives you:
+
+Golden Signals
+
+Metrics -> Prometheus
+Logs    -> Loki
+Traces  -> Tempo
+
+and creates a production-grade observability foundation before we start deploying business applications.
+
+My suggested order from here:
+
+1. EFS CSI Driver
+2. Loki
+3. Tempo
+4. OpenTelemetry Collector
+5. Karpenter
+6. Sample Java Application
+7. CI/CD Pipeline
+8. Service Mesh (Istio)
+9. Backstage
+10. Crossplane
+11. Enterprise IDP
+
+Let's start with EFS CSI Driver via Terraform + GitOps, because it completes the storage layer of the platform and follows naturally from the EBS work we just finished.
