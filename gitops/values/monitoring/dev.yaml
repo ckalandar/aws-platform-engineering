@@ -23,6 +23,11 @@ grafana:
       access: proxy
       url: http://loki.loki.svc.cluster.local:3100
       isDefault: false
+
+    - name: Tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.tempo.svc.cluster.local:3100
 prometheus:
   prometheusSpec:
 
