@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: alloy
+  namespace: argocd
+
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: alloy
+
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    targetRevision: 1.2.1
+
+    helm:
+      valueFiles:
+        - $values/gitops/values/alloy/dev.yaml
+
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: alloy
+      targetRevision: 1.2.1
+
+      helm:
+        valueFiles:
+          - $values/gitops/values/alloy/dev.yaml
+
+    - repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+      targetRevision: main
+      ref: values
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true

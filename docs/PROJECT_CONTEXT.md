@@ -10835,3 +10835,598 @@ My suggested order from here:
 11. Enterprise IDP
 
 Let's start with EFS CSI Driver via Terraform + GitOps, because it completes the storage layer of the platform and follows naturally from the EBS work we just finished.
+
+Perfect.
+
+This is exactly the GitOps workflow we want:
+
+Terraform
+ ├─ VPC
+ ├─ EKS
+ ├─ IRSA
+ ├─ EBS CSI
+ ├─ StorageClass
+ └─ Cluster Infrastructure
+
+ArgoCD
+ ├─ Prometheus
+ ├─ Grafana
+ ├─ Loki
+ ├─ Tempo
+ ├─ OTel Collector
+ ├─ Istio
+ └─ Workloads
+
+Since Loki itself is already healthy:
+
+loki-0                 2/2 Running
+loki-canary-*          Running
+PVC                    Bound
+
+the only missing piece is Grafana datasource provisioning.
+
+Your values should look something like:
+
+grafana:
+
+  adminPassword: admin123
+
+  service:
+    type: ClusterIP
+
+  ingress:
+    enabled: true
+    ingressClassName: alb
+
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+
+    hosts:
+      - grafana.dev.learnsystems.co
+
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki.loki.svc.cluster.local:3100
+      editable: true
+
+After ArgoCD syncs:
+
+Connections
+ ├─ Prometheus
+ ├─ Alertmanager
+ └─ Loki
+
+should appear automatically.
+
+Small architectural note
+
+For a production platform I would eventually move Grafana credentials out of Git:
+
+Current:
+
+adminPassword: admin123
+
+Future:
+
+AWS Secrets Manager
+        ↓
+External Secrets Operator
+        ↓
+Grafana Secret
+
+We already have External Secrets running, so later we can wire Grafana, ArgoCD, Backstage, Tempo, etc. to Secrets Manager.
+
+Once the monitoring app becomes Healthy/Synced again
+
+Validate:
+
+kubectl get application -n argocd monitoring
+
+Then check Grafana:
+
+Connections → Data Sources
+
+If Loki appears, we can immediately proceed to the next platform component:
+
+Observability Stack
+───────────────────
+✅ Prometheus
+✅ Grafana
+✅ Loki
+⬜ Tempo
+⬜ OpenTelemetry Collector
+
+I recommend doing Tempo and OpenTelemetry Collector together in the next commit, because Tempo without trace collection doesn't provide much value, whereas deploying both gives you a complete metrics + logs + traces observability platform.
+
+loki is available now but I don't see any logs 
+
+This is actually expected at this stage.
+
+You have:
+
+Grafana  ✅
+Loki     ✅
+
+but you do not have anything shipping logs to Loki yet.
+
+Loki is just storage and query.
+
+Something must collect logs from the nodes and push them to Loki.
+
+Typically:
+
+Application Pods
+        ↓
+Container stdout/stderr
+        ↓
+Promtail OR Grafana Alloy OR OTel Collector
+        ↓
+Loki
+        ↓
+Grafana
+Verify whether Loki has any log streams
+
+In Grafana Explore, try:
+
+{job=~".+"}
+
+or
+
+{}
+
+If you get:
+
+No labels found
+
+or
+
+Empty result
+
+then nothing is writing to Loki.
+
+Check what's deployed
+
+Run:
+
+kubectl get pods -A | grep -E "promtail|alloy|fluent|otel"
+
+I expect you'll get nothing.
+
+Because looking at your GitOps tree, I don't see:
+
+promtail
+alloy
+otel-collector
+fluent-bit
+
+applications anywhere.
+
+Production Recommendation
+
+I would not deploy Promtail now.
+
+Promtail is being phased out by Grafana.
+
+Since your roadmap already includes:
+
+✅ Prometheus
+✅ Grafana
+✅ Loki
+⬜ Tempo
+⬜ OpenTelemetry Collector
+
+the better path is:
+
+OpenTelemetry Collector
+        ↓
+Loki
+        ↓
+Tempo
+        ↓
+Prometheus
+
+One collector handles:
+
+Metrics
+Logs
+Traces
+
+instead of deploying multiple agents.
+
+Quick validation
+
+Run:
+
+kubectl get pods -A | grep loki
+
+and
+
+kubectl get pods -A | grep -E "promtail|alloy|otel"
+
+If the second command returns nothing, we've found the issue.
+
+Platform Architecture Suggestion
+
+Given what you're building (Platform Engineering → IDP), I'd slightly adjust the roadmap:
+
+Current
+-------
+✅ EKS
+✅ ArgoCD
+✅ External Secrets
+✅ External DNS
+✅ ALB Controller
+✅ Prometheus
+✅ Grafana
+✅ Loki
+
+Next
+----
+1. OpenTelemetry Collector
+2. Tempo
+3. Java App Instrumentation
+4. Karpenter
+5. CI/CD
+6. Istio
+7. Backstage
+8. Crossplane
+9. Enterprise IDP
+
+The reason is that Tempo is almost useless until something emits traces, and OpenTelemetry Collector is what will give you logs, metrics, and traces flowing through the platform in a production-style architecture.
+
+So before touching Tempo, let's add an OpenTelemetry Collector GitOps application and wire:
+
+Pods → OTel Collector → Loki
+Pods → OTel Collector → Tempo
+Pods → OTel Collector → Prometheus
+
+That gives you a complete observability foundation.
+
+kubectl get pods -A | grep -E "promtail|alloy|fluent|otel"
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get pods -A | grep loki
+loki               loki-0                                                   2/2     Running   0          51m
+loki               loki-canary-7gzd5                                        1/1     Running   0          28m
+loki               loki-canary-99hhp                                        1/1     Running   0          28m
+loki               loki-canary-dkfzd                                        1/1     Running   0          28m
+
+Exactly. That confirms the diagnosis.
+
+You have:
+
+✅ Loki running
+✅ Grafana datasource configured
+❌ No log collector deployed
+
+Loki is sitting there waiting for logs, but nothing is sending any.
+
+What happened?
+
+When you installed Loki, you probably used the simple chart deployment:
+
+Loki
+└── StatefulSet
+
+but not:
+
+Loki
+└── Promtail
+
+or
+
+Loki
+└── Grafana Alloy
+
+or
+
+Loki
+└── OpenTelemetry Collector
+Since we're building a modern platform...
+
+I would not install Promtail.
+
+Promtail still works, but Grafana's direction is moving toward Grafana Alloy and OpenTelemetry.
+
+Your roadmap already includes:
+
+1. Loki
+2. Tempo
+3. OpenTelemetry Collector
+
+so we should do it properly.
+
+Recommended Next Step
+
+Deploy:
+
+OpenTelemetry Collector
+
+via ArgoCD.
+
+Then:
+
+Node Logs
+        ↓
+OTel Collector
+        ↓
+Loki
+
+Application Traces
+        ↓
+OTel Collector
+        ↓
+Tempo
+
+Metrics
+        ↓
+OTel Collector
+        ↓
+Prometheus
+
+This becomes your enterprise observability pipeline.
+
+If you want logs immediately
+
+We can deploy Grafana Alloy first.
+
+Architecture:
+
+Node
+ └─ /var/log/containers/*.log
+          ↓
+      Alloy
+          ↓
+       Loki
+
+Then all pods:
+
+springboot
+argocd
+external-secrets
+coredns
+aws-load-balancer-controller
+
+will automatically appear in Grafana.
+
+What I would do as your platform architect
+
+Current state:
+
+✅ EKS
+✅ ArgoCD
+✅ External DNS
+✅ External Secrets
+✅ ALB Controller
+✅ Prometheus
+✅ Grafana
+✅ Loki
+✅ EBS CSI
+
+Next:
+
+1. Grafana Alloy
+2. Tempo
+3. OpenTelemetry Collector
+4. Java Auto-Instrumentation
+5. Karpenter
+6. CI/CD
+7. Istio
+8. Backstage
+9. Crossplane
+10. Enterprise IDP
+
+Reason:
+
+Alloy immediately gives logs.
+Tempo needs traces.
+OTel Collector ties everything together.
+Then your Java app can emit traces and you'll see:
+Metrics in Prometheus
+Logs in Loki
+Traces in Tempo
+
+which is where observability becomes truly useful.
+
+So I'd proceed with Grafana Alloy via ArgoCD next, then Tempo, then instrument the Spring Boot application. That will give you a complete logs + metrics + traces stack before moving on to Karpenter and the platform engineering pieces.
+
+lets proceed further
+
+Good. At this point you've crossed the "basic EKS cluster" stage and entered the "platform engineering" stage.
+
+Current platform status:
+
+Infrastructure
+--------------
+✅ VPC
+✅ EKS
+✅ ECR
+✅ RDS
+✅ Route53
+✅ Security Groups
+✅ EBS CSI
+✅ GP3 StorageClass
+
+GitOps
+------
+✅ ArgoCD
+✅ App of Apps
+
+Platform Services
+-----------------
+✅ AWS Load Balancer Controller
+✅ External DNS
+✅ External Secrets
+
+Observability
+-------------
+✅ Prometheus
+✅ Grafana
+✅ Loki
+⬜ Log Collection
+⬜ Tempo
+⬜ OpenTelemetry Collector
+What should be next?
+
+There are two possible paths:
+
+Path A (Recommended)
+
+Complete observability first:
+
+Alloy
+↓
+Tempo
+↓
+OpenTelemetry Collector
+↓
+Spring Boot instrumentation
+
+Result:
+
+Metrics  -> Prometheus
+Logs     -> Loki
+Traces   -> Tempo
+
+This gives you a complete observability platform.
+
+Path B
+
+Jump to:
+
+Karpenter
+
+But Karpenter is more valuable once applications are generating real workload.
+
+My recommendation
+
+Let's finish observability.
+
+Step 1: Deploy Grafana Alloy
+
+Create:
+
+gitops/
+├── applications/
+│   └── platform/
+│       └── alloy.yaml
+
+├── values/
+│   └── alloy/
+│       └── dev.yaml
+Application
+
+gitops/applications/platform/alloy.yaml
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: alloy
+  namespace: argocd
+
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: alloy
+
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    targetRevision: 1.2.1
+
+    helm:
+      valueFiles:
+        - $values/gitops/values/alloy/dev.yaml
+
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: alloy
+      targetRevision: 1.2.1
+
+      helm:
+        valueFiles:
+          - $values/gitops/values/alloy/dev.yaml
+
+    - repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+      targetRevision: main
+      ref: values
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
+Values
+
+gitops/values/alloy/dev.yaml
+
+alloy:
+
+  configMap:
+    create: true
+
+    content: |
+      logging {
+        level = "info"
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki.loki.svc.cluster.local:3100/loki/api/v1/push"
+        }
+      }
+
+      local.file_match "pods" {
+        path_targets = [{
+          __path__ = "/var/log/containers/*.log"
+        }]
+      }
+
+      loki.source.file "pods" {
+        targets    = local.file_match.pods.targets
+        forward_to = [loki.write.default.receiver]
+      }
+Commit
+git add .
+git commit -m "Add Grafana Alloy"
+git push
+Verify
+kubectl get applications -n argocd
+
+You should see:
+
+alloy
+Healthy
+Synced
+
+Then:
+
+kubectl get pods -n alloy
+
+Expected:
+
+alloy-xxxxx Running
+Verify logs
+
+Open Grafana:
+
+Explore
+→ Loki
+
+Query:
+
+{namespace="springboot"}
+
+or
+
+{namespace="argocd"}
+
+You should start seeing container logs.
+
+After Alloy is healthy and logs are flowing, the next step is Tempo, because then we'll start collecting traces from the Spring Boot application and build a true enterprise observability stack.
