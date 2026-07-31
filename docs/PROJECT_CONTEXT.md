@@ -11430,3 +11430,565 @@ or
 You should start seeing container logs.
 
 After Alloy is healthy and logs are flowing, the next step is Tempo, because then we'll start collecting traces from the Spring Boot application and build a true enterprise observability stack.
+
+Pasted text(13).txt
+Document
+
+This explains the problem.
+
+Your values file only defines the Alloy configuration, but does not configure the DaemonSet to mount node log directories.
+
+Right now Alloy is trying to read:
+
+__path__ = "/var/log/containers/*.log"
+
+but inside the pod:
+
+ls /var/log/containers
+
+returns:
+
+No such file or directory
+
+which proves the host filesystem isn't mounted.
+
+First determine the chart values structure
+
+Let's inspect the rendered DaemonSet:
+
+kubectl get ds alloy -n alloy -o yaml | grep -A30 volumeMounts
+
+and
+
+kubectl get ds alloy -n alloy -o yaml | grep -A30 volumes
+
+This tells us whether:
+
+The chart supports built-in log mounts that aren't enabled.
+We need extraVolumes.
+We need controller.extraVolumeMounts.
+We need a different values structure entirely.
+What I expect we'll need
+
+Something like:
+
+alloy:
+
+  mounts:
+    varlog: true
+
+or
+
+alloy:
+
+  extraVolumes:
+    - name: varlog
+      hostPath:
+        path: /var/log
+
+  extraVolumeMounts:
+    - name: varlog
+      mountPath: /var/log
+      readOnly: true
+
+But I don't want to guess because Grafana's Alloy chart has changed values structure multiple times.
+
+Another thing I noticed
+
+Your config currently has:
+
+loki.process "pods" {
+  forward_to = [loki.write.default.receiver]
+}
+
+but nothing forwards into it.
+
+You currently have:
+
+loki.source.file "pods" {
+  targets    = local.file_match.pods.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+which bypasses the processor completely.
+
+That won't crash Alloy, but it's dead code.
+
+Eventually we should do:
+
+loki.source.file
+        ↓
+loki.process
+        ↓
+loki.write
+
+for labels and parsing.
+
+Next step
+
+Show me:
+
+kubectl get ds alloy -n alloy -o yaml | grep -A30 volumeMounts
+
+and
+
+kubectl get ds alloy -n alloy -o yaml | grep -A30 volumes
+
+Once I see how the chart rendered, I'll give you the exact GitOps values to commit so Alloy can access /var/log/containers and start shipping logs to Loki.
+
+kubectl get ds alloy -n alloy -o yaml | grep -A30 volumeMounts
+      {"apiVersion":"apps/v1","kind":"DaemonSet","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"alloy:apps/DaemonSet:alloy/alloy"},"labels":{"app.kubernetes.io/instance":"alloy","app.kubernetes.io/managed-by":"Helm","app.kubernetes.io/name":"alloy","app.kubernetes.io/part-of":"alloy","app.kubernetes.io/version":"v1.10.1","helm.sh/chart":"alloy-1.2.1"},"name":"alloy","namespace":"alloy"},"spec":{"minReadySeconds":10,"selector":{"matchLabels":{"app.kubernetes.io/instance":"alloy","app.kubernetes.io/name":"alloy"}},"template":{"metadata":{"annotations":{"checksum/config":"79e84cf8852515542f16fb251ec86493b31b86c364465e4a05abacc6f83d85f","kubectl.kubernetes.io/default-container":"alloy"},"labels":{"app.kubernetes.io/instance":"alloy","app.kubernetes.io/name":"alloy"}},"spec":{"containers":[{"args":["run","/etc/alloy/config.alloy","--storage.path=/tmp/alloy","--server.http.listen-addr=0.0.0.0:12345","--server.http.ui-path-prefix=/","--stability.level=generally-available"],"env":[{"name":"ALLOY_DEPLOY_MODE","value":"helm"},{"name":"HOSTNAME","valueFrom":{"fieldRef":{"fieldPath":"spec.nodeName"}}}],"image":"docker.io/grafana/alloy:v1.10.1","imagePullPolicy":"IfNotPresent","name":"alloy","ports":[{"containerPort":12345,"name":"http-metrics"}],"readinessProbe":{"httpGet":{"path":"/-/ready","port":12345,"scheme":"HTTP"},"initialDelaySeconds":10,"timeoutSeconds":1},"volumeMounts":[{"mountPath":"/etc/alloy","name":"config"}]},{"args":["--watched-dir=/etc/alloy","--reload-url=http://localhost:12345/-/reload"],"image":"quay.io/prometheus-operator/prometheus-config-reloader:v0.81.0","name":"config-reloader","resources":{"requests":{"cpu":"10m","memory":"50Mi"}},"volumeMounts":[{"mountPath":"/etc/alloy","name":"config"}]}],"dnsPolicy":"ClusterFirst","serviceAccountName":"alloy","volumes":[{"configMap":{"name":"alloy"},"name":"config"}]}}}}
+  creationTimestamp: "2026-07-31T13:02:42Z"
+  generation: 2
+  labels:
+    app.kubernetes.io/instance: alloy
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/version: v1.10.1
+    helm.sh/chart: alloy-1.2.1
+  name: alloy
+  namespace: alloy
+  resourceVersion: "672053"
+  uid: 61322148-7e0f-4727-ba91-bdcd59b06763
+spec:
+  minReadySeconds: 10
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: alloy
+      app.kubernetes.io/name: alloy
+  template:
+    metadata:
+      annotations:
+        checksum/config: 79e84cf8852515542f16fb251ec86493b31b86c364465e4a05abacc6f83d85f
+        kubectl.kubernetes.io/default-container: alloy
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/instance: alloy
+        app.kubernetes.io/name: alloy
+    spec:
+--
+        volumeMounts:
+        - mountPath: /etc/alloy
+          name: config
+      - args:
+        - --watched-dir=/etc/alloy
+        - --reload-url=http://localhost:12345/-/reload
+        image: quay.io/prometheus-operator/prometheus-config-reloader:v0.81.0
+        imagePullPolicy: IfNotPresent
+        name: config-reloader
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/alloy
+          name: config
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: alloy
+      serviceAccountName: alloy
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: alloy
+        name: config
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+status:
+  currentNumberScheduled: 3
+  desiredNumberScheduled: 3
+  numberAvailable: 3
+  numberMisscheduled: 0
+  numberReady: 3
+  observedGeneration: 2
+  updatedNumberScheduled: 3
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get ds alloy -n alloy -o yaml | grep -A30 volumes
+      {"apiVersion":"apps/v1","kind":"DaemonSet","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"alloy:apps/DaemonSet:alloy/alloy"},"labels":{"app.kubernetes.io/instance":"alloy","app.kubernetes.io/managed-by":"Helm","app.kubernetes.io/name":"alloy","app.kubernetes.io/part-of":"alloy","app.kubernetes.io/version":"v1.10.1","helm.sh/chart":"alloy-1.2.1"},"name":"alloy","namespace":"alloy"},"spec":{"minReadySeconds":10,"selector":{"matchLabels":{"app.kubernetes.io/instance":"alloy","app.kubernetes.io/name":"alloy"}},"template":{"metadata":{"annotations":{"checksum/config":"79e84cf8852515542f16fb251ec86493b31b86c364465e4a05abacc6f83d85f","kubectl.kubernetes.io/default-container":"alloy"},"labels":{"app.kubernetes.io/instance":"alloy","app.kubernetes.io/name":"alloy"}},"spec":{"containers":[{"args":["run","/etc/alloy/config.alloy","--storage.path=/tmp/alloy","--server.http.listen-addr=0.0.0.0:12345","--server.http.ui-path-prefix=/","--stability.level=generally-available"],"env":[{"name":"ALLOY_DEPLOY_MODE","value":"helm"},{"name":"HOSTNAME","valueFrom":{"fieldRef":{"fieldPath":"spec.nodeName"}}}],"image":"docker.io/grafana/alloy:v1.10.1","imagePullPolicy":"IfNotPresent","name":"alloy","ports":[{"containerPort":12345,"name":"http-metrics"}],"readinessProbe":{"httpGet":{"path":"/-/ready","port":12345,"scheme":"HTTP"},"initialDelaySeconds":10,"timeoutSeconds":1},"volumeMounts":[{"mountPath":"/etc/alloy","name":"config"}]},{"args":["--watched-dir=/etc/alloy","--reload-url=http://localhost:12345/-/reload"],"image":"quay.io/prometheus-operator/prometheus-config-reloader:v0.81.0","name":"config-reloader","resources":{"requests":{"cpu":"10m","memory":"50Mi"}},"volumeMounts":[{"mountPath":"/etc/alloy","name":"config"}]}],"dnsPolicy":"ClusterFirst","serviceAccountName":"alloy","volumes":[{"configMap":{"name":"alloy"},"name":"config"}]}}}}
+  creationTimestamp: "2026-07-31T13:02:42Z"
+  generation: 2
+  labels:
+    app.kubernetes.io/instance: alloy
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/part-of: alloy
+    app.kubernetes.io/version: v1.10.1
+    helm.sh/chart: alloy-1.2.1
+  name: alloy
+  namespace: alloy
+  resourceVersion: "672053"
+  uid: 61322148-7e0f-4727-ba91-bdcd59b06763
+spec:
+  minReadySeconds: 10
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: alloy
+      app.kubernetes.io/name: alloy
+  template:
+    metadata:
+      annotations:
+        checksum/config: 79e84cf8852515542f16fb251ec86493b31b86c364465e4a05abacc6f83d85f
+        kubectl.kubernetes.io/default-container: alloy
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/instance: alloy
+        app.kubernetes.io/name: alloy
+    spec:
+--
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: alloy
+        name: config
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+status:
+  currentNumberScheduled: 3
+  desiredNumberScheduled: 3
+  numberAvailable: 3
+  numberMisscheduled: 0
+  numberReady: 3
+  observedGeneration: 2
+  updatedNumberScheduled: 3
+
+Perfect. Now we have the real problem.
+
+Your Alloy DaemonSet has zero hostPath mounts.
+
+Current state:
+
+volumeMounts:
+  - mountPath: /etc/alloy
+    name: config
+
+volumes:
+  - name: config
+    configMap:
+      name: alloy
+
+That's it.
+
+So Alloy can read:
+
+/etc/alloy/config.alloy
+
+but cannot read:
+
+/var/log/containers
+/var/log/pods
+
+which is why:
+
+kubectl exec -n alloy alloy-thnhp -- ls /var/log/containers
+
+failed.
+
+Before changing values blindly
+
+Let's identify exactly which Alloy chart you're using.
+
+Show me:
+
+cat gitops/applications/platform/alloy.yaml
+
+or if it doesn't exist:
+
+grep -R "grafana/alloy" gitops
+
+or
+
+grep -R "chart: alloy" gitops
+
+I want to see:
+
+repoURL:
+chart:
+targetRevision:
+
+because the values structure differs between chart versions.
+
+What we'll ultimately add
+
+Something along these lines:
+
+alloy:
+
+  extraVolumes:
+    - name: varlog
+      hostPath:
+        path: /var/log
+
+  extraVolumeMounts:
+    - name: varlog
+      mountPath: /var/log
+      readOnly: true
+
+or possibly:
+
+controller:
+  extraVolumes:
+  extraVolumeMounts:
+
+depending on chart version.
+
+Platform Engineering Observation
+
+This is exactly why I wanted us to move into observability after Prometheus.
+
+You've now encountered three classic production issues:
+
+Storage Layer
+Prometheus PVC Pending
+        ↓
+EBS CSI missing
+Compute Layer
+Loki Pending
+        ↓
+Node capacity exhausted
+Logging Layer
+Loki datasource healthy
+        ↓
+No log shipper mounted to host logs
+
+These are the kinds of issues platform teams solve every day.
+
+Once you show me the Alloy ArgoCD application YAML, I'll give you the exact gitops/values/alloy/dev.yaml structure for chart 1.2.1 and we'll get logs flowing into Loki. After that, the next major step is Tempo + OpenTelemetry, which will complete metrics + logs + traces.
+
+cat gitops/applications/platform/alloy.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: alloy
+  namespace: argocd
+
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: alloy
+
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    targetRevision: 1.2.1
+
+    helm:
+      valueFiles:
+        - $values/gitops/values/alloy/dev.yaml
+
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: alloy
+      targetRevision: 1.2.1
+
+      helm:
+        valueFiles:
+          - $values/gitops/values/alloy/dev.yaml
+
+    - repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+      targetRevision: main
+      ref: values
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
+
+Good. Now we know exactly what we're dealing with.
+
+You're using:
+
+chart: alloy
+targetRevision: 1.2.1
+
+and the rendered DaemonSet confirms that none of the host log mounts are enabled.
+
+First thing I'd clean up
+
+Your ArgoCD Application has both:
+
+spec:
+  source:
+
+and
+
+spec:
+  sources:
+
+You should only keep:
+
+spec:
+  sources:
+
+since you're using a multi-source application.
+
+Remove the entire:
+
+source:
+  repoURL: ...
+
+block.
+
+It isn't causing the Alloy issue, but it's technical debt.
+
+Fix Alloy properly
+
+Update:
+
+gitops/values/alloy/dev.yaml
+
+to:
+
+alloy:
+
+  mounts:
+    varlog: true
+
+  extraVolumes:
+
+    - name: varlogpods
+      hostPath:
+        path: /var/log/pods
+
+    - name: varlogcontainers
+      hostPath:
+        path: /var/log/containers
+
+  extraVolumeMounts:
+
+    - name: varlogpods
+      mountPath: /var/log/pods
+      readOnly: true
+
+    - name: varlogcontainers
+      mountPath: /var/log/containers
+      readOnly: true
+
+  configMap:
+    create: true
+
+    content: |
+      logging {
+        level = "info"
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki.loki.svc.cluster.local:3100/loki/api/v1/push"
+        }
+      }
+
+      local.file_match "pods" {
+        path_targets = [
+          {
+            __path__ = "/var/log/containers/*.log",
+          },
+        ]
+      }
+
+      loki.source.file "pods" {
+        targets    = local.file_match.pods.targets
+        forward_to = [loki.write.default.receiver]
+      }
+
+Commit that.
+
+After Argo syncs
+
+Verify mounts exist:
+
+kubectl get ds alloy -n alloy -o yaml | grep -A5 varlog
+
+You should see:
+
+hostPath:
+  path: /var/log/containers
+
+hostPath:
+  path: /var/log/pods
+Then verify inside Alloy
+kubectl exec -n alloy alloy-xxxx -- ls /var/log/containers | head
+
+Expected:
+
+argocd-server...
+coredns...
+prometheus...
+springboot...
+
+not:
+
+No such file or directory
+Then verify Loki ingestion
+
+Run:
+
+kubectl logs -n alloy alloy-xxxx -c alloy
+
+You should see no errors.
+
+Then in Grafana Explore:
+
+Datasource:
+
+Loki
+
+Query:
+
+{namespace="argocd"}
+
+or
+
+{namespace="springboot"}
+
+If labels aren't present yet:
+
+{}
+
+and switch to:
+
+Last 15 minutes
+Architecture note
+
+What you've built so far is now becoming a real observability stack:
+
+EKS
+ ├── Prometheus
+ ├── Alertmanager
+ ├── Grafana
+ ├── Loki
+ └── Alloy
+
+Once logs are flowing, the next component should be:
+
+Tempo
+
+followed by:
+
+OpenTelemetry Collector
+
+because then your Spring Boot app can emit:
+
+Metrics  -> Prometheus
+Logs     -> Loki
+Traces   -> Tempo
+
+and Grafana can correlate all three from a single dashboard. That's where the platform starts feeling like an enterprise observability solution rather than a collection of tools.

@@ -1,0 +1,13 @@
+tempo:
+
+  retention: 24h
+
+persistence:
+  enabled: true
+
+  storageClassName: gp3
+
+  size: 10Gi
+
+service:
+  type: ClusterIP
