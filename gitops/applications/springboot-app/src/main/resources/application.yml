@@ -1,12 +1,30 @@
 server:
   port: 8080
 
+spring:
+  application:
+    name: platform-demo
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
-spring:
-  application:
-    name: platform-demo
+otel:
+  exporter:
+    otlp:
+      endpoint: http://tempo.tempo.svc.cluster.local:4318
+
+  traces:
+    exporter: otlp
+
+  metrics:
+    exporter: none
+
+  logs:
+    exporter: none
+
+  resource:
+    attributes:
+      service.name: platform-demo

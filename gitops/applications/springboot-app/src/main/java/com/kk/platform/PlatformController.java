@@ -41,8 +41,26 @@ public class PlatformController {
     @GetMapping("/config")
     public Map<String, String> config() {
 
-    return Map.of(
-            "username", System.getenv("APP_USERNAME"),
-            "service", "platform-demo");
+        return Map.of(
+                "username", username,
+                "service", "platform-demo");
+    }
+
+    @GetMapping("/orders")
+    public Map<String, Object> orders() {
+
+        return Map.of(
+                "orderId", "ORD-1001",
+                "status", "SUCCESS",
+                "amount", 2500);
+    }
+
+    @GetMapping("/payments")
+    public Map<String, Object> payments() {
+
+        return Map.of(
+                "paymentId", "PAY-2001",
+                "status", "COMPLETED",
+                "amount", 2500);
     }
 }
