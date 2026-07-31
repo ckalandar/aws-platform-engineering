@@ -1,5 +1,28 @@
 alloy:
 
+  mounts:
+    varlog: true
+
+  extraVolumes:
+
+    - name: varlogpods
+      hostPath:
+        path: /var/log/pods
+
+    - name: varlogcontainers
+      hostPath:
+        path: /var/log/containers
+
+  extraVolumeMounts:
+
+    - name: varlogpods
+      mountPath: /var/log/pods
+      readOnly: true
+
+    - name: varlogcontainers
+      mountPath: /var/log/containers
+      readOnly: true
+
   configMap:
     create: true
 
@@ -24,9 +47,5 @@ alloy:
 
       loki.source.file "pods" {
         targets    = local.file_match.pods.targets
-        forward_to = [loki.write.default.receiver]
-      }
-
-      loki.process "pods" {
         forward_to = [loki.write.default.receiver]
       }
