@@ -15,12 +15,18 @@ alloy:
       }
 
       local.file_match "pods" {
-        path_targets = [{
-          __path__ = "/var/log/containers/*.log"
-        }]
+        path_targets = [
+          {
+            __path__ = "/var/log/containers/*.log",
+          },
+        ]
       }
 
       loki.source.file "pods" {
         targets    = local.file_match.pods.targets
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.process "pods" {
         forward_to = [loki.write.default.receiver]
       }
