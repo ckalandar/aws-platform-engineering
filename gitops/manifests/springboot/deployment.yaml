@@ -17,10 +17,28 @@ spec:
         app: springboot
 
     spec:
+      securityContext:
+        fsGroup: 10001
       containers:
         - name: springboot
 
           image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:90852d5d2f0eb6cc7f15d77be3e45718df230ab2
+
+          securityContext:
+                runAsNonRoot: true
+                runAsUser: 10001
+                runAsGroup: 10001
+
+                allowPrivilegeEscalation: false
+
+                capabilities:
+                  drop:
+                    - ALL
+
+                #readOnlyRootFilesystem: true
+
+                seccompProfile:
+                  type: RuntimeDefault
 
           ports:
             - containerPort: 8080

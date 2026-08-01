@@ -14156,3 +14156,1782 @@ Service graph in Tempo
 Grafana dashboards and alerts
 
 Each step builds directly on what you've already working today.
+
+curl -v https://springboot.dev.learnsystems.co/config
+* Host springboot.dev.learnsystems.co:443 was resolved.
+                                                       * IPv6: (none)
+                                                                     * IPv4: 100.56.181.163, 52.70.193.32
+                                                                                                         *   Trying 100.56.181.163:443...
+                      * Connected to springboot.dev.learnsystems.co (100.56.181.163) port 443
+                                                                                             * ALPN: curl offers h2,http/1.1
+         * (304) (OUT), TLS handshake, Client hello (1):
+                                                        *  CAfile: /etc/ssl/cert.pem
+                                                                                    *  CApath: none
+                                                                                                   * (304) (IN), TLS handshake, Server hello (2):
+                              * TLSv1.2 (IN), TLS handshake, Certificate (11):
+                                                                              * TLSv1.2 (IN), TLS handshake, Server key exchange (12):
+                   * TLSv1.2 (IN), TLS handshake, Server finished (14):
+                                                                       * TLSv1.2 (OUT), TLS handshake, Client key exchange (16):
+             * TLSv1.2 (OUT), TLS change cipher, Change cipher spec (1):
+                                                                        * TLSv1.2 (OUT), TLS handshake, Finished (20):
+   * TLSv1.2 (IN), TLS change cipher, Change cipher spec (1):
+                                                             * TLSv1.2 (IN), TLS handshake, Finished (20):
+                                                                                                          * SSL connection using TLSv1.2 / ECDHE-RSA-AES128-GCM-SHA256 / [blank] / UNDEF
+                                                                     * ALPN: server accepted h2
+                                                                                               * Server certificate:
+ *  subject: CN=*.dev.learnsystems.co
+                                     *  start date: Jul 29 00:00:00 2026 GMT
+                                                                            *  expire date: Feb 11 23:59:59 2027 GMT
+ *  subjectAltName: host "springboot.dev.learnsystems.co" matched cert's "*.dev.learnsystems.co"
+                                                                                                *  issuer: C=US; O=Amazon; CN=Amazon RSA 2048 M01
+                              *  SSL certificate verify ok.
+                                                           * using HTTP/2
+                                                                         * [HTTP/2] [1] OPENED stream for https://springboot.dev.learnsystems.co/config
+                                    * [HTTP/2] [1] [:method: GET]
+                                                                 * [HTTP/2] [1] [:scheme: https]
+                                                                                                * [HTTP/2] [1] [:authority: springboot.dev.learnsystems.co]
+                                        * [HTTP/2] [1] [:path: /config]
+                                                                       * [HTTP/2] [1] [user-agent: curl/8.7.1]
+                                                                                                              * [HTTP/2] [1] [accept: */*]
+                       > GET /config HTTP/2
+> Host: springboot.dev.learnsystems.co
+> User-Agent: curl/8.7.1
+> Accept: */*
+>
+* Request completely sent off
+                             < HTTP/2 200
+< date: Sat, 01 Aug 2026 10:02:27 GMT
+< content-type: application/json
+<
+* Connection #0 to host springboot.dev.learnsystems.co left intact
+                                                                  {"username":"admin","service":"platform-demo"}%  kchilak@kalandars-MacBook-Pro aws-platform-engineering % kubectl get deploy springboot -n springboot \
+-o=jsonpath='{.spec.template.spec.containers[0].image}'
+136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:90852d5d2f0eb6cc7f15d77be3e45718df230ab2%               kchilak@kalandars-MacBook-Pro aws-platform-engineering % kubectl logs -n springboot deploy/springboot --tail=50
+Found 2 pods, using pod/springboot-f6c7bcc9b-r9txm
+                                                  2026-08-01 09:59:54 [http-nio-8080-exec-7] INFO  trace_id=046b2633490d66152c9b26435500d45a span_id=b916b1abebffdb41 com.kk.platform.PlatformController - Home endpoint called
+
+                                                                                                            2026-08-01 10:00:08 [http-nio-8080-exec-9] INFO  trace_id=63894e5c81a30df0c274995eb7a8bfd3 span_id=1ec9a20e933acdfe com.kk.platform.PlatformController - Home endpoint called
+
+                                                   2026-08-01 10:00:09 [http-nio-8080-exec-10] INFO  trace_id=00099380824ed3184d9f7f53196a1424 span_id=28795d50f17bbaa1 com.kk.platform.PlatformController - Home endpoint called
+
+                                                                                                              2026-08-01 10:00:23 [http-nio-8080-exec-1] INFO  trace_id=41186ce7811fc8a4c9150b10044ac083 span_id=ac357d2b76940025 com.kk.platform.PlatformController - Home endpoint called
+
+                                                     2026-08-01 10:00:24 [http-nio-8080-exec-2] INFO  trace_id=255f6659f3f21d855364f35f80dada6d span_id=d74d80803eacc2d3 com.kk.platform.PlatformController - Home endpoint called
+
+                                                                                                               2026-08-01 10:00:38 [http-nio-8080-exec-3] INFO  trace_id=24c06725f2065248b2099e46fda79cac span_id=79ba7bf13d64af77 com.kk.platform.PlatformController - Home endpoint called
+
+                                                      2026-08-01 10:00:39 [http-nio-8080-exec-4] INFO  trace_id=00e3a74461a5da2242eeb8d0279ecb58 span_id=4826252921e1a29d com.kk.platform.PlatformController - Home endpoint called
+
+                                                                                                                2026-08-01 10:00:53 [http-nio-8080-exec-6] INFO  trace_id=ca8cdf5e10cc8f48d6ae3aaea5d39181 span_id=e4a418c2ccc650c8 com.kk.platform.PlatformController - Home endpoint called
+
+                                                       2026-08-01 10:00:54 [http-nio-8080-exec-7] INFO  trace_id=7f36c97292500d3883dbc4ef858791ca span_id=3c993b452525dac9 com.kk.platform.PlatformController - Home endpoint called
+
+                                                                                                                 2026-08-01 10:01:08 [http-nio-8080-exec-9] INFO  trace_id=d70b85ff87974d23d3b53c9992ff4eda span_id=98adf4456f7c1cf7 com.kk.platform.PlatformController - Home endpoint called
+
+                                                        2026-08-01 10:01:09 [http-nio-8080-exec-10] INFO  trace_id=73f97a4b6ce003b9da308ce916aeb1c9 span_id=67829fbc5873984f com.kk.platform.PlatformController - Home endpoint called
+
+                                                                                                                   2026-08-01 10:01:23 [http-nio-8080-exec-1] INFO  trace_id=c106d496e91363099d79c7a2954f0c4e span_id=16d3ca85332a3383 com.kk.platform.PlatformController - Home endpoint called
+
+                                                          2026-08-01 10:01:24 [http-nio-8080-exec-2] INFO  trace_id=498196abf5a9cac34d97d8b7145da5d8 span_id=b281ab20e178fd89 com.kk.platform.PlatformController - Home endpoint called
+
+ 2026-08-01 10:01:39 [http-nio-8080-exec-3] INFO  trace_id=40ef9400b33fdf5b23495f9fde82bd34 span_id=016ae5e2401eefdc com.kk.platform.PlatformController - Home endpoint called
+
+                                                           2026-08-01 10:01:39 [http-nio-8080-exec-4] INFO  trace_id=d80be88933cb0533c5056ae329cb2765 span_id=ae8877003a95ee6d com.kk.platform.PlatformController - Home endpoint called
+
+  2026-08-01 10:01:54 [http-nio-8080-exec-5] INFO  trace_id=3b2f3904e8e6db576d91ca54a331dcde span_id=7de08e8fff93dc7b com.kk.platform.PlatformController - Home endpoint called
+
+                                                            2026-08-01 10:01:54 [http-nio-8080-exec-6] INFO  trace_id=346de5d65d85a34661ac16b010547c4b span_id=4b293cee36660c49 com.kk.platform.PlatformController - Home endpoint called
+
+   2026-08-01 10:02:09 [http-nio-8080-exec-7] INFO  trace_id=511e90ddb672ea5c3b6f200678ca8b1a span_id=b074c9c52b4127c5 com.kk.platform.PlatformController - Home endpoint called
+
+                                                             2026-08-01 10:02:09 [http-nio-8080-exec-8] INFO  trace_id=d3b98129327321240a1120689b159301 span_id=b182d7e117ec2d4d com.kk.platform.PlatformController - Home endpoint called
+
+    2026-08-01 10:02:24 [http-nio-8080-exec-9] INFO  trace_id=ac9c8b23cd0aa7aab39eb8ce3a0455dc span_id=cefc7b34d05bbb97 com.kk.platform.PlatformController - Home endpoint called
+
+                                                              2026-08-01 10:02:24 [http-nio-8080-exec-10] INFO  trace_id=3ea5116004fd6611d30206ca6cae2b8d span_id=ffb4682c8ae0b469 com.kk.platform.PlatformController - Home endpoint called
+
+      2026-08-01 10:02:39 [http-nio-8080-exec-2] INFO  trace_id=fa4757d0b77ba4a294700406dba15623 span_id=fa276cf796e0ae24 com.kk.platform.PlatformController - Home endpoint called
+
+                                                                2026-08-01 10:02:39 [http-nio-8080-exec-3] INFO  trace_id=07487c386b709e9fa38d6c4c7113ccc6 span_id=32b7fc6f95d7abf8 com.kk.platform.PlatformController - Home endpoint called
+
+       2026-08-01 10:02:54 [http-nio-8080-exec-4] INFO  trace_id=ae0cce6cd3552f3868ef4f4ab3c6e1a5 span_id=dcb5f5d231120cdc com.kk.platform.PlatformController - Home endpoint called
+
+                                                                 2026-08-01 10:02:54 [http-nio-8080-exec-5] INFO  trace_id=0e8683966331f560a011c9eb0dfe8219 span_id=3f3f0c24b4cc0328 com.kk.platform.PlatformController - Home endpoint called
+
+        %    
+analyse the snapshot I had just attached it is showing config-read also in Grafana
+
+Yes — this screenshot changes the conclusion significantly.
+
+Looking carefully at your Grafana Tempo search:
+
+Service Name = platform-demo
+Span Name = config-read
+Grafana has accepted the query and generated:
+{resource.service.name="platform-demo" && name="config-read"}
+
+That means Grafana already knows that a span called config-read exists in Tempo's index.
+
+If Tempo had never seen that span name, searching for it would normally return nothing.
+
+What this proves
+
+You have successfully completed the important part:
+
+✅ Spring Boot application is generating manual spans
+✅ OTEL exporter is sending spans to Tempo
+✅ Tempo is indexing config-read spans
+✅ Grafana can query those spans
+
+In other words:
+
+Span span = tracer.spanBuilder("config-read").startSpan();
+
+is working.
+
+What I would do next
+
+Click the blue Refresh/Search button in the upper right.
+
+If traces appear in the results table below, then you have end-to-end tracing working.
+
+If no results appear
+
+Most likely one of these:
+
+1. Time range too narrow
+
+Check Grafana's time picker.
+
+Try:
+
+Last 1 hour
+
+or
+
+Last 6 hours
+
+and search again.
+
+2. Need fresh traffic
+
+Generate traffic:
+
+for i in {1..20}; do
+  curl -s https://springboot.dev.learnsystems.co/config >/dev/null
+done
+
+Wait 10–20 seconds and search again.
+
+3. Query traces without filtering
+
+Remove:
+
+Span Name = config-read
+
+Keep only:
+
+Service Name = platform-demo
+
+Search.
+
+You should see traces such as:
+
+GET /config
+GET /
+
+Open a trace and inspect the span tree.
+
+You should find:
+
+GET /config
+└── config-read
+Looking at your logs
+
+This is another strong signal:
+
+trace_id=ac9c8b23cd0aa7aab39eb8ce3a0455dc
+span_id=cefc7b34d05bbb97
+
+The logging pattern is receiving OpenTelemetry context.
+
+That means:
+
+Request
+   ↓
+Spring Instrumentation
+   ↓
+Trace Context
+   ↓
+Logs
+   ↓
+Tempo
+
+is already wired together.
+
+From an observability-engineering perspective
+
+You've now demonstrated:
+
+Application deployment through GitOps/ArgoCD
+OpenTelemetry instrumentation
+Context propagation
+Trace correlation in logs
+Tempo ingestion
+Grafana trace search
+Custom business span (config-read)
+
+That's the core of a production distributed tracing setup.
+
+The next valuable exercise would be to open one trace and verify the hierarchy looks something like:
+
+GET /config
+ └── config-read
+
+and that the config.username attribute you set on the span is visible in Tempo. If you can see that attribute, then your manual instrumentation is fully validated end-to-end.
+
+I can see the traces see the attached snapshot
+
+Yes — this screenshot is the proof we were looking for.
+
+What I can see in the Tempo search results:
+
+Trace name: GET /config
+Service: platform-demo
+Child span: config-read
+Multiple traces returned successfully
+
+The important part is this row:
+
+GET /config
+  └── config-read
+
+That means:
+
+Request hits your application.
+
+Spring/OpenTelemetry creates the HTTP server span:
+
+GET /config
+
+Your manual instrumentation creates:
+
+config-read
+Tempo receives both spans.
+Grafana can search and display them.
+
+So the manual span implementation is working correctly.
+
+What you have successfully validated
+Automatic instrumentation
+
+OpenTelemetry automatically created:
+
+GET /config
+
+This comes from Spring Boot instrumentation.
+
+Manual instrumentation
+
+Your code created:
+
+config-read
+
+This comes from:
+
+Span span = tracer.spanBuilder("config-read").startSpan();
+
+or equivalent code.
+
+Trace hierarchy
+
+The child span is attached to the HTTP request span.
+
+Trace
+└── GET /config
+      └── config-read
+
+This is exactly how business spans should appear.
+
+Next thing to verify
+
+Click on one of the trace IDs:
+
+ba75b1032c13...
+
+Then inspect the trace details.
+
+You should see attributes similar to:
+
+service.name=platform-demo
+http.method=GET
+http.route=/config
+
+and hopefully your custom attribute:
+
+span.setAttribute("config.username", username);
+
+or whatever attribute name you used.
+
+If you see that custom attribute, then you've validated:
+
+Application
+    ↓
+OpenTelemetry SDK
+    ↓
+OTLP Export
+    ↓
+Tempo
+    ↓
+Grafana Search
+    ↓
+Custom Span Attributes
+
+end-to-end.
+
+From a Platform Engineering perspective
+
+At this point your platform already demonstrates:
+
+Infrastructure
+Terraform
+EKS
+ALB
+Route53
+ACM
+ArgoCD
+Security
+Kubernetes Secrets
+HTTPS/TLS
+ExternalDNS
+Observability
+Prometheus
+Grafana
+Loki (if installed)
+Tempo
+OpenTelemetry
+Application
+Spring Boot
+CI/CD
+GitOps
+Distributed tracing
+
+This is already the foundation of a production-grade internal developer platform.
+
+The next natural step is to instrument a second service (for example a Config Service or User Service) and then observe a distributed trace flowing:
+
+Client
+  ↓
+Springboot API
+  ↓
+Config Service
+  ↓
+Database
+
+where Tempo shows spans across multiple services in a single trace. That's where distributed tracing becomes really powerful.
+
+do we really need this second service now? can't we progress further?
+
+No, you do not need a second service right now.
+
+The reason I suggested it is because distributed tracing becomes more impressive when a request crosses service boundaries. But from a platform engineering learning perspective, you've already proven the OpenTelemetry → Tempo → Grafana pipeline works.
+
+You've reached this milestone:
+
+User
+  ↓
+ALB
+  ↓
+Ingress
+  ↓
+Spring Boot
+  ↓
+OpenTelemetry
+  ↓
+Tempo
+  ↓
+Grafana
+
+and you have evidence:
+
+GET /config
+  └── config-read
+
+So I would not spend more time adding another service yet.
+
+Where I would go next
+
+Looking at your original goal:
+
+Learn implementation, architecture, troubleshooting, platform engineering, production-grade systems.
+
+Observability was only one component.
+
+Your platform currently looks something like:
+
+Terraform
+    ↓
+EKS
+    ↓
+ArgoCD
+    ↓
+Spring Boot
+    ↓
+Secrets
+    ↓
+ALB + Route53
+    ↓
+Observability
+
+The next high-value topics are:
+
+Option 1: Kubernetes Security (Recommended)
+
+This is usually the next major platform engineering layer.
+
+Implement:
+
+Network Policies
+
+Restrict pod-to-pod communication.
+
+Example:
+
+springboot
+    ↓
+can talk to
+    ↓
+tempo
+
+but NOT
+
+random pod
+    ↓
+springboot
+
+Learn:
+
+CNI
+Calico/Cilium
+Egress control
+Namespace isolation
+
+These are common production interview topics.
+
+Pod Security
+
+Add:
+
+runAsNonRoot: true
+
+allowPrivilegeEscalation: false
+
+readOnlyRootFilesystem: true
+
+Understand:
+
+Privileged containers
+Linux capabilities
+Security Contexts
+External Secrets Operator
+
+Instead of:
+
+AWS Secrets Manager
+      ↓
+manual sync
+      ↓
+Kubernetes Secret
+
+Use:
+
+AWS Secrets Manager
+      ↓
+External Secrets Operator
+      ↓
+Kubernetes Secret
+      ↓
+Application
+
+This is a real-world production pattern.
+
+Option 2: Service Mesh
+
+Good learning but larger effort.
+
+Add:
+
+Istio
+Linkerd
+
+Learn:
+
+mTLS
+Traffic Splitting
+Canary Releases
+Retries
+Circuit Breakers
+
+I would postpone this until security fundamentals are complete.
+
+Option 3: Platform Engineering / IDP
+
+This aligns closely with your stated goal.
+
+Current flow:
+
+Developer
+    ↓
+Git Repo
+    ↓
+ArgoCD
+    ↓
+Deployment
+
+Build:
+
+Developer
+    ↓
+Backstage
+    ↓
+Template
+    ↓
+Git Repo
+    ↓
+ArgoCD
+    ↓
+Deployment
+
+Learn:
+
+Backstage
+Software Catalog
+Templates
+Self-Service Deployments
+
+This is modern Platform Engineering.
+
+Option 4: Production Operations
+
+This is what senior SREs and platform engineers do daily.
+
+Implement:
+
+HPA
+CPU > 70%
+    ↓
+scale pods
+Karpenter
+pods increase
+    ↓
+nodes increase
+Pod Disruption Budgets
+minAvailable: 1
+Readiness/Liveness Probes
+Resource Quotas
+Limit Ranges
+If I were mentoring you
+
+I would choose this order:
+
+Phase 1 (Done)
+
+✅ Terraform
+
+✅ EKS
+
+✅ ArgoCD
+
+✅ Spring Boot
+
+✅ ALB
+
+✅ Route53
+
+✅ Secrets
+
+✅ OpenTelemetry
+
+✅ Tempo
+
+✅ Grafana
+
+Phase 2
+
+✅ Network Policies
+
+✅ External Secrets Operator
+
+✅ Pod Security Standards
+
+✅ RBAC
+
+Phase 3
+
+✅ Prometheus Alerting
+
+✅ HPA
+
+✅ Karpenter
+
+✅ Disaster Recovery
+
+Phase 4
+
+✅ Backstage
+
+✅ Developer Self-Service
+
+✅ Internal Developer Platform
+
+This path will teach you far more about real platform engineering than adding a second demo microservice right now. The observability proof-of-concept is already complete. The bigger gaps are security, operations, and developer platform capabilities.
+Excellent. You've completed the "deploy an application on Kubernetes with observability" phase.
+
+Now let's start building the platform like a real enterprise platform team would.
+
+Next Milestone: Kubernetes Security Foundation
+
+Before we touch Service Mesh, Backstage, or advanced platform engineering, we need to secure the cluster.
+
+Most EKS environments fail audits because they lack:
+
+Pod Security
+Network Segmentation
+RBAC
+Secret Management
+Workload Identity
+Phase 2.1 — Lock Down the SpringBoot Pod
+
+Currently your pod is probably running as:
+
+root user
+writable filesystem
+default capabilities
+
+That's fine for learning.
+
+Not fine for production.
+
+Goal
+
+When we finish, the pod should run as:
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+Check Current State
+
+Run:
+
+kubectl exec -it -n springboot deploy/springboot -- id
+
+Expected:
+
+uid=0(root)
+
+or
+
+uid=1000
+
+Show me the output.
+
+Phase 2.2 — Audit RBAC
+
+Let's see what permissions your application has.
+
+Run:
+
+kubectl auth can-i --list \
+--as=system:serviceaccount:springboot:default \
+-n springboot
+
+This tells us:
+
+Can create pods?
+Can read secrets?
+Can list namespaces?
+
+Many applications accidentally get too many permissions.
+
+Show me the output.
+
+Phase 2.3 — Network Segmentation
+
+Right now any pod in the cluster can probably talk to:
+
+springboot
+grafana
+tempo
+prometheus
+argocd
+
+A compromised pod could scan everything.
+
+We want:
+
+springboot
+   ├── tempo: allowed
+   ├── dns: allowed
+   └── everything else: denied
+
+First let's see if your cluster supports NetworkPolicies.
+
+Run:
+
+kubectl get pods -A -o wide
+
+and
+
+kubectl get daemonset -A
+
+I want to see whether you're using:
+
+AWS VPC CNI
+Cilium
+Calico
+
+because NetworkPolicy behavior depends on the CNI.
+
+Phase 2.4 — Secrets Modernization
+
+Currently:
+
+AWS Secrets Manager
+      ↓
+kubectl secret
+      ↓
+pod
+
+I want to know how you're creating the secret.
+
+Run:
+
+kubectl get secret app-config -n springboot -o yaml
+
+(remove the base64 values before sharing if you prefer)
+
+and show me:
+
+kubectl describe secret app-config -n springboot
+
+We're going to decide whether to move to:
+
+External Secrets Operator
+
+which is the production-grade pattern.
+
+Why we're doing this before Service Mesh
+
+A common enterprise maturity path is:
+
+Application
+    ↓
+Observability
+    ↓
+Security
+    ↓
+Scaling
+    ↓
+Platform Engineering
+
+You have completed Observability.
+
+The next biggest gap in your platform is Security.
+
+So let's start with these four checks:
+
+kubectl exec -it -n springboot deploy/springboot -- id
+
+kubectl auth can-i --list \
+--as=system:serviceaccount:springboot:default \
+-n springboot
+
+kubectl get pods -A -o wide
+
+kubectl get daemonset -A
+
+kubectl describe secret app-config -n springboot
+
+Post the outputs and we'll perform a proper platform security review before making changes.
+
+That's exactly the right concern.
+
+A junior engineer sees:
+
+No NetworkPolicies found
+
+and immediately creates a deny-all policy.
+
+A platform architect asks:
+
+"What workloads exist today, what workloads will exist in 3 months, what traffic patterns will emerge, and what operational burden will these controls create?"
+
+That's the correct approach.
+
+Let's Analyze Your Platform First
+
+Current platform:
+
+Internet
+   │
+Route53
+   │
+ALB
+   │
+SpringBoot
+   │
+External Secrets
+   │
+AWS Secrets Manager
+
+SpringBoot
+   │
+OpenTelemetry
+   │
+Tempo
+
+Alloy
+   │
+Loki
+
+Prometheus
+   │
+Grafana
+
+You also have:
+
+ArgoCD
+ExternalDNS
+AWS Load Balancer Controller
+Karpenter (future)
+
+running in-cluster.
+
+What Happens If We Add Strict Network Policies Today?
+
+Many people assume:
+
+deny all
+allow app traffic
+
+is automatically better.
+
+Not always.
+
+Risk 1: Break Future Microservices
+
+Today:
+
+SpringBoot
+
+Tomorrow:
+
+SpringBoot
+     │
+     ├── User Service
+     ├── Config Service
+     ├── Payment Service
+     └── Notification Service
+
+If we lock networking too aggressively now:
+
+SpringBoot -> Config Service
+
+fails later.
+
+Then developers start opening holes everywhere.
+
+Result:
+
+20+
+NetworkPolicies
+
+nobody understands.
+
+Risk 2: Break Observability
+
+Currently:
+
+SpringBoot
+   │
+OTLP 4318
+   │
+Tempo
+
+works.
+
+Later:
+
+Prometheus scraping
+Grafana access
+Metrics exporter
+Log shipping
+OTEL Collector
+
+may require additional paths.
+
+A deny-all policy often breaks telemetry first.
+
+And telemetry is usually the thing you need during an outage.
+
+Risk 3: ArgoCD and Operational Tooling
+
+Future scenarios:
+
+Argo Rollouts
+Argo Events
+Notifications
+Webhook Receivers
+
+may need namespace communication.
+
+Security controls should not prevent platform evolution.
+
+What Would I Do In Enterprise?
+
+Not this:
+
+Namespace
+   ↓
+Deny All
+
+Too early.
+
+Instead:
+
+Phase 1
+
+Inventory traffic.
+
+Questions:
+
+Who talks to SpringBoot?
+Who talks to Tempo?
+Who talks to Loki?
+Who talks to Prometheus?
+
+before blocking anything.
+
+Phase 2
+
+Observe flows.
+
+With Cilium/Hubble or Calico Flow Logs:
+
+springboot -> tempo
+springboot -> dns
+prometheus -> kube-state-metrics
+alloy -> loki
+
+Now you know actual dependencies.
+
+Phase 3
+
+Apply policies gradually.
+
+Example:
+
+Allow DNS
+Allow OTLP
+Allow Ingress
+
+Deny everything else
+
+for one namespace.
+
+Validate.
+
+Expand.
+
+What Security Gap Is Bigger Right Now?
+
+Honestly?
+
+Not NetworkPolicies.
+
+This is.
+
+uid=0(root)
+
+Your application runs as root.
+
+That is a more immediate security concern than open pod networking in your current environment.
+
+If an attacker exploits SpringBoot:
+
+Remote Code Execution
+      ↓
+root inside container
+
+Now they have maximum privileges inside the container.
+
+My Architectural Priorities For Your Platform
+
+If this were my EKS platform:
+
+Priority 1
+
+Container Hardening
+
+runAsNonRoot
+drop capabilities
+readOnlyRootFilesystem
+
+Low risk.
+
+High value.
+
+Almost no architectural impact.
+
+Priority 2
+
+HPA
+
+You currently have:
+
+2 replicas
+fixed
+
+No autoscaling.
+
+For a platform project:
+
+CPU -> HPA -> Pods
+
+is more valuable than NetworkPolicies.
+
+Priority 3
+
+Karpenter
+
+Then:
+
+Pods scale
+Nodes scale
+
+Now you're demonstrating cloud-native elasticity.
+
+Priority 4
+
+Network Policies
+
+After traffic patterns are known.
+
+Priority 5
+
+Service Mesh
+
+When you actually have multiple services.
+
+What I Would Recommend Today
+
+Do not implement NetworkPolicies yet.
+
+Instead:
+
+Keep networking open for now.
+Harden the SpringBoot container.
+Add HPA.
+Add Karpenter.
+Build one more service (Config Service or User Service).
+Observe service-to-service traffic in Tempo.
+Then design NetworkPolicies based on real communication patterns.
+
+That sequence matches how mature platform teams typically evolve a new EKS platform. Right now, your biggest architectural gap is workload hardening and autoscaling, not east-west traffic restrictions.
+
+kubectl get svc -A
+NAMESPACE          NAME                                                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                                                                   AGE
+alloy              alloy                                                ClusterIP   172.20.230.20    <none>        12345/TCP                                                                                                 21h
+argocd             argocd-applicationset-controller                     ClusterIP   172.20.30.82     <none>        7000/TCP                                                                                                  3d3h
+argocd             argocd-dex-server                                    ClusterIP   172.20.43.97     <none>        5556/TCP,5557/TCP                                                                                         3d3h
+argocd             argocd-redis                                         ClusterIP   172.20.108.214   <none>        6379/TCP                                                                                                  3d3h
+argocd             argocd-repo-server                                   ClusterIP   172.20.138.253   <none>        8081/TCP                                                                                                  3d3h
+argocd             argocd-server                                        ClusterIP   172.20.167.172   <none>        80/TCP,443/TCP                                                                                            3d3h
+default            kubernetes                                           ClusterIP   172.20.0.1       <none>        443/TCP                                                                                                   3d3h
+demo               nginx                                                ClusterIP   172.20.49.13     <none>        80/TCP                                                                                                    3d3h
+external-secrets   external-secrets-webhook                             ClusterIP   172.20.173.250   <none>        443/TCP                                                                                                   47h
+kube-system        aws-load-balancer-webhook-service                    ClusterIP   172.20.202.41    <none>        443/TCP                                                                                                   3d3h
+kube-system        eks-extension-metrics-api                            ClusterIP   172.20.151.249   <none>        443/TCP                                                                                                   3d3h
+kube-system        external-dns                                         ClusterIP   172.20.247.62    <none>        7979/TCP                                                                                                  2d22h
+kube-system        kube-dns                                             ClusterIP   172.20.0.10      <none>        53/UDP,53/TCP,9153/TCP                                                                                    3d3h
+kube-system        monitoring-kube-prometheus-coredns                   ClusterIP   None             <none>        9153/TCP                                                                                                  45h
+kube-system        monitoring-kube-prometheus-kube-controller-manager   ClusterIP   None             <none>        10257/TCP                                                                                                 45h
+kube-system        monitoring-kube-prometheus-kube-etcd                 ClusterIP   None             <none>        2381/TCP                                                                                                  45h
+kube-system        monitoring-kube-prometheus-kube-proxy                ClusterIP   None             <none>        10249/TCP                                                                                                 45h
+kube-system        monitoring-kube-prometheus-kube-scheduler            ClusterIP   None             <none>        10259/TCP                                                                                                 45h
+kube-system        monitoring-kube-prometheus-kubelet                   ClusterIP   None             <none>        10250/TCP,10255/TCP,4194/TCP                                                                              45h
+loki               loki                                                 ClusterIP   172.20.47.70     <none>        3100/TCP,9095/TCP                                                                                         22h
+loki               loki-canary                                          ClusterIP   172.20.233.134   <none>        3500/TCP                                                                                                  22h
+loki               loki-headless                                        ClusterIP   None             <none>        3100/TCP                                                                                                  22h
+loki               loki-memberlist                                      ClusterIP   None             <none>        7946/TCP                                                                                                  22h
+monitoring         alertmanager-operated                                ClusterIP   None             <none>        9093/TCP,9094/TCP,9094/UDP                                                                                27h
+monitoring         monitoring-grafana                                   ClusterIP   172.20.161.255   <none>        80/TCP                                                                                                    45h
+monitoring         monitoring-kube-prometheus-alertmanager              ClusterIP   172.20.152.211   <none>        9093/TCP,8080/TCP                                                                                         45h
+monitoring         monitoring-kube-prometheus-operator                  ClusterIP   172.20.125.197   <none>        443/TCP                                                                                                   45h
+monitoring         monitoring-kube-prometheus-prometheus                ClusterIP   172.20.171.218   <none>        9090/TCP,8080/TCP                                                                                         45h
+monitoring         monitoring-kube-state-metrics                        ClusterIP   172.20.115.148   <none>        8080/TCP                                                                                                  45h
+monitoring         monitoring-prometheus-node-exporter                  ClusterIP   172.20.23.103    <none>        9100/TCP                                                                                                  45h
+monitoring         prometheus-operated                                  ClusterIP   None             <none>        9090/TCP                                                                                                  27h
+springboot         springboot                                           ClusterIP   172.20.94.41     <none>        80/TCP                                                                                                    3d3h
+tempo              tempo                                                ClusterIP   172.20.138.215   <none>        6831/UDP,6832/UDP,3200/TCP,14268/TCP,14250/TCP,9411/TCP,55680/TCP,55681/TCP,4317/TCP,4318/TCP,55678/TCP   17h
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get ingress -A
+NAMESPACE    NAME                 CLASS   HOSTS                            ADDRESS                                                                   PORTS   AGE
+demo         nginx                alb     *                                k8s-demo-nginx-2e5ada922c-716034082.us-east-1.elb.amazonaws.com           80      3d3h
+monitoring   monitoring-grafana   alb     grafana.dev.learnsystems.co      k8s-monitori-monitori-17da4d04b1-1367080749.us-east-1.elb.amazonaws.com   80      45h
+springboot   springboot           alb     springboot.dev.learnsystems.co   k8s-springbo-springbo-2f4bc59496-561847438.us-east-1.elb.amazonaws.com    80      3d3h
+
+This output is exactly what I wanted before making any security recommendations.
+
+Looking at your platform as an architect, I would not deploy NetworkPolicies yet.
+
+Here's why.
+
+Current Architecture
+Internet
+   │
+Route53
+   │
+ALB Ingress
+   │
+SpringBoot
+   │
+──────────────
+   │
+Tempo
+Loki
+Prometheus
+Grafana
+──────────────
+   │
+External Secrets
+   │
+AWS Secrets Manager
+
+ArgoCD
+ExternalDNS
+AWS LB Controller
+
+This is still a platform foundation stage, not a mature microservices platform.
+
+What I Observe
+1. SpringBoot is already talking to Tempo
+
+You proved that.
+
+Grafana shows:
+
+GET /
+config-read
+
+Those spans are arriving.
+
+Meaning:
+
+SpringBoot
+   │
+4318
+   │
+Tempo
+
+must remain open.
+
+2. DNS is critical
+
+Everything relies on:
+
+kube-dns
+172.20.0.10
+
+If we accidentally block DNS:
+
+tempo.tempo.svc.cluster.local
+
+stops resolving.
+
+Then:
+
+OTEL → Tempo
+
+breaks instantly.
+
+3. Prometheus Future Dependency
+
+Today:
+
+SpringBoot
+
+is not exporting metrics.
+
+Tomorrow:
+
+/actuator/prometheus
+
+will be scraped by:
+
+monitoring-kube-prometheus-prometheus
+
+If we lock ingress too early:
+
+Prometheus scraping fails
+4. External Secrets Dependency
+
+Today your app only consumes:
+
+Secret app-config
+
+from Kubernetes.
+
+No runtime AWS calls.
+
+That's good.
+
+But later you may introduce:
+
+IRSA
+AWS SDK
+S3
+SQS
+SNS
+DynamoDB
+RDS
+
+Network policies must accommodate that evolution.
+
+The Bigger Security Findings
+
+From your output:
+
+kubectl exec ... -- id
+
+uid=0(root)
+
+This is currently a larger issue.
+
+Because:
+
+NetworkPolicy
+   protects traffic
+
+runAsRoot
+   affects workload compromise
+
+If someone achieves RCE:
+
+SpringBoot exploit
+       ↓
+Shell
+       ↓
+root inside container
+
+That's a higher-priority risk.
+
+What I Would Do Next
+
+Not NetworkPolicies.
+
+I'd move to workload hardening.
+
+Phase 1
+
+Fix:
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+
+capabilities:
+  drop:
+    - ALL
+
+Verify app still works.
+
+Phase 2
+
+Add Pod Security Standards
+
+Namespace labels:
+
+pod-security.kubernetes.io/enforce: restricted
+pod-security.kubernetes.io/audit: restricted
+pod-security.kubernetes.io/warn: restricted
+
+This immediately elevates the security posture.
+
+Phase 3
+
+Metrics
+
+Add:
+
+Micrometer
+Prometheus scraping
+Grafana dashboards
+
+Right now you have:
+
+Logs ✓
+Traces ✓
+Metrics ✗
+
+Observability is incomplete until metrics exist.
+
+Phase 4
+
+HPA
+
+Currently:
+
+replicas: 2
+
+static.
+
+Add:
+
+CPU based scaling
+Memory based scaling
+Phase 5
+
+Karpenter
+
+Then:
+
+Pods scale
+Nodes scale
+Phase 6
+
+Introduce a second service
+
+For example:
+
+platform-demo
+      │
+      └── config-service
+
+or
+
+platform-demo
+      │
+      └── user-service
+
+Now tracing becomes truly valuable because you'll see:
+
+ALB
+ ↓
+SpringBoot
+ ↓
+Config Service
+
+as a distributed trace.
+
+When Should We Implement NetworkPolicies?
+
+After at least one of these exists:
+
+Service A -> Service B
+Service A -> RDS
+Service A -> Redis
+Service A -> SQS
+Service A -> DynamoDB
+
+Then we can observe actual traffic patterns and create policies that match reality.
+
+Otherwise we're designing controls for dependencies that don't exist yet.
+
+If I were reviewing this platform for production-readiness today, my roadmap would be:
+
+1. Container Hardening        ← next
+2. Metrics                    ← next
+3. HPA
+4. Karpenter
+5. Second Microservice
+6. Network Policies
+7. Service Mesh
+
+That sequence gives the highest architectural value with the lowest chance of breaking your current platform.
+
+You remember this order for future, you have been changing umpteen times on this order now 1. Container Hardening        ← next
+2. Metrics                    ← next
+3. HPA
+4. Karpenter
+5. Second Microservice
+6. Network Policies
+7. Service Mesh
+
+Fair point, and you're right to call it out.
+
+The reason you've seen the order change is because the platform itself has changed significantly during the build.
+
+For example:
+
+A few days ago
+
+No Tempo
+No traces
+No External Secrets
+No Grafana
+No realistic workload
+
+At that stage I would have prioritized:
+
+HPA
+Karpenter
+Microservice
+Observability
+
+because there wasn't much worth securing yet.
+
+Today, after seeing the actual cluster state:
+
+✓ EKS
+✓ ArgoCD
+✓ External Secrets
+✓ ExternalDNS
+✓ ALB Controller
+✓ Grafana
+✓ Loki
+✓ Tempo
+✓ Distributed tracing
+✓ SpringBoot workload
+
+the priorities become different.
+
+I can now see:
+
+uid=0(root)
+
+which is a concrete security issue.
+
+I can also see:
+
+No metrics from application
+
+which means your observability stack is only 66% complete:
+
+Logs     ✓
+Traces   ✓
+Metrics  ✗
+
+So the roadmap evolved based on evidence rather than a fixed checklist.
+
+For this platform's current state, I would now lock the roadmap as:
+
+PHASE 1 — Workload Security
+1. Container Hardening
+2. Pod Security Standards
+
+PHASE 2 — Observability
+3. Application Metrics (Micrometer + Prometheus)
+4. Grafana Dashboards
+5. Alerting
+
+PHASE 3 — Scalability
+6. HPA
+7. Load Testing
+8. Karpenter
+
+PHASE 4 — Platform Expansion
+9. Second Microservice
+10. Distributed Tracing Across Services
+
+PHASE 5 — Zero Trust Networking
+11. Network Policies
+12. RBAC Hardening
+13. IRSA Adoption Everywhere
+
+PHASE 6 — Platform Engineering
+14. Service Mesh
+15. Progressive Delivery (Argo Rollouts)
+16. Developer Self-Service / IDP
+
+This is the sequence I would recommend unless the architecture changes materially (for example adding RDS, Redis, SQS, multiple services, multi-tenant namespaces, etc.).
+
+So yes—going forward, for the platform you've built today, let's treat this as the baseline roadmap rather than reshuffling every few messages.
+
+Immediate next task: Container Hardening.
+
+That gives the biggest security improvement with the lowest blast radius and doesn't interfere with Tempo, Loki, Prometheus, ArgoCD, External Secrets, ALB, or any future
+
+lets start as planned, now stop giving summary and speedddddd it up what we have to achieve, I am running the resources on my own personal account with cost associated
+
+Agreed. You're paying for the infrastructure, so we'll prioritize highest learning value per dollar spent and avoid rabbit holes.
+
+Current Status
+
+✅ EKS
+✅ Terraform
+✅ ArgoCD
+✅ External Secrets
+✅ ALB Ingress
+✅ Route53
+✅ TLS/ACM
+✅ Loki
+✅ Tempo
+✅ Grafana
+✅ Distributed Tracing
+
+Next:
+
+Phase 1 — Container Hardening (30 min)
+Goal
+
+Move from:
+
+uid=0(root)
+
+to:
+
+uid=10001(appuser)
+
+and enforce:
+
+runAsNonRoot: true
+allowPrivilegeEscalation: false
+readOnlyRootFilesystem: true
+capabilities:
+  drop:
+    - ALL
+
+This is a real production control.
+
+Step 1
+
+Show me:
+
+Dockerfile
+cat Dockerfile
+
+or
+
+cat docker/Dockerfile
+
+wherever it lives.
+
+Also show deployment
+kubectl get deploy springboot -n springboot -o yaml
+
+or just paste the container section.
+
+Once I see those two files, I'll give you the exact minimal changes.
+
+No theory. No summaries.
+
+Just the changes.
+
+Dockerfile
+FROM eclipse-temurin:21-jre
+
+WORKDIR /app
+
+COPY target/platform-demo-1.0.0.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java","-jar","app.jar"]
+kubectl get deploy springboot -n springboot -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: springboot:apps/Deployment:springboot/springboot
+    deployment.kubernetes.io/revision: "11"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"springboot:apps/Deployment:springboot/springboot"},"name":"springboot","namespace":"springboot"},"spec":{"replicas":2,"selector":{"matchLabels":{"app":"springboot"}},"template":{"metadata":{"labels":{"app":"springboot"}},"spec":{"containers":[{"env":[{"name":"APP_USERNAME","valueFrom":{"secretKeyRef":{"key":"username","name":"app-config"}}},{"name":"APP_PASSWORD","valueFrom":{"secretKeyRef":{"key":"password","name":"app-config"}}},{"name":"APP_API_KEY","valueFrom":{"secretKeyRef":{"key":"apiKey","name":"app-config"}}},{"name":"OTEL_SERVICE_NAME","value":"platform-demo"},{"name":"OTEL_TRACES_EXPORTER","value":"otlp"},{"name":"OTEL_METRICS_EXPORTER","value":"none"},{"name":"OTEL_LOGS_EXPORTER","value":"none"},{"name":"OTEL_EXPORTER_OTLP_ENDPOINT","value":"http://tempo.tempo.svc.cluster.local:4318"},{"name":"OTEL_EXPORTER_OTLP_PROTOCOL","value":"http/protobuf"}],"image":"136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:90852d5d2f0eb6cc7f15d77be3e45718df230ab2","name":"springboot","ports":[{"containerPort":8080}],"resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}]}}}}
+  creationTimestamp: "2026-07-29T07:27:33Z"
+  generation: 11
+  name: springboot
+  namespace: springboot
+  resourceVersion: "967578"
+  uid: 33b0a80f-b8ea-4edd-8b5a-ba5479dfb96f
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: springboot
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-07-29T22:21:44+05:30"
+      creationTimestamp: null
+      labels:
+        app: springboot
+    spec:
+      containers:
+      - env:
+        - name: APP_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: app-config
+        - name: APP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: app-config
+        - name: APP_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: apiKey
+              name: app-config
+        - name: OTEL_SERVICE_NAME
+          value: platform-demo
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_METRICS_EXPORTER
+          value: none
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://tempo.tempo.svc.cluster.local:4318
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: http/protobuf
+        image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:90852d5d2f0eb6cc7f15d77be3e45718df230ab2
+        imagePullPolicy: IfNotPresent
+        name: springboot
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 2
+  conditions:
+  - lastTransitionTime: "2026-08-01T09:56:37Z"
+    lastUpdateTime: "2026-08-01T09:56:37Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-07-29T16:41:51Z"
+    lastUpdateTime: "2026-08-01T09:56:37Z"
+    message: ReplicaSet "springboot-f6c7bcc9b" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 11
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+
+Good. Your app is currently running as root and has zero container security controls.
+
+1. Fix Dockerfile
+
+Replace with:
+
+FROM eclipse-temurin:21-jre
+
+RUN addgroup --system appgroup && \
+    adduser --system --ingroup appgroup --uid 10001 appuser
+
+WORKDIR /app
+
+COPY target/platform-demo-1.0.0.jar app.jar
+
+RUN chown -R appuser:appgroup /app
+
+USER 10001
+
+EXPOSE 8080
+
+ENTRYPOINT ["java","-jar","app.jar"]
+2. Add Container Security Context
+
+In your deployment manifest:
+
+containers:
+  - name: springboot
+    image: ...
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+
+      allowPrivilegeEscalation: false
+
+      capabilities:
+        drop:
+          - ALL
+
+      readOnlyRootFilesystem: true
+
+      seccompProfile:
+        type: RuntimeDefault
+3. Add Pod Security Context
+
+Under:
+
+spec:
+  template:
+    spec:
+
+add:
+
+securityContext:
+  fsGroup: 10001
+4. Build + Push
+
+Your normal pipeline.
+
+No manual kubectl edits.
+
+Argo should deploy it.
+
+5. Verify
+
+After rollout:
+
+kubectl exec -it -n springboot deploy/springboot -- id
+
+Expected:
+
+uid=10001(appuser)
+gid=10001(appgroup)
+6. Verify Security Context
+kubectl get pod -n springboot \
+-o yaml | grep -A20 securityContext
+
+Should show:
+
+runAsNonRoot: true
+allowPrivilegeEscalation: false
+readOnlyRootFilesystem: true
+7. Watch for Failure
+
+The one thing that may break is:
+
+readOnlyRootFilesystem: true
+
+because some Java libraries write temp files.
+
+If pods fail:
+
+kubectl logs <pod> -n springboot
+
+Paste the error.
+
+We'll mount a small writable /tmp volume if needed.
+
+Make these changes and deploy. Don't touch RBAC, NetworkPolicies, HPA, or Karpenter yet. We want a clean hardened workload first.
