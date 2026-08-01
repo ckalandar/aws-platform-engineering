@@ -1,2 +1,3 @@
-com/kk/platform/PlatformController.class
 com/kk/platform/Application.class
+com/kk/platform/PlatformService.class
+com/kk/platform/PlatformController.class

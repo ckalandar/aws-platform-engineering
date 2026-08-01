@@ -1,2 +1,3 @@
 /Users/kchilak/Documents/Devops/aws-platform-engineering/gitops/applications/springboot-app/src/main/java/com/kk/platform/Application.java
 /Users/kchilak/Documents/Devops/aws-platform-engineering/gitops/applications/springboot-app/src/main/java/com/kk/platform/PlatformController.java
+/Users/kchilak/Documents/Devops/aws-platform-engineering/gitops/applications/springboot-app/src/main/java/com/kk/platform/PlatformService.java

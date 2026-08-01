@@ -1,16 +1,34 @@
 package com.kk.platform;
 
-import io.opentelemetry.instrumentation.annotations.WithSpan;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
 import org.springframework.stereotype.Service;
 
 @Service
 public class PlatformService {
 
-    @WithSpan("config-read")
+    private final Tracer tracer;
+
+    public PlatformService(Tracer tracer) {
+        this.tracer = tracer;
+    }
+
     public String getConfig() throws Exception {
 
-        Thread.sleep(100);
+        Span span = tracer
+                .spanBuilder("config-read")
+                .startSpan();
 
-        return "success";
+        try {
+
+            Thread.sleep(100);
+
+            return "success";
+
+        } finally {
+
+            span.end();
+
+        }
     }
 }
