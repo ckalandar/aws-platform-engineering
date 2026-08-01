@@ -60,15 +60,15 @@ resource "aws_subnet" "private_app" {
 
   availability_zone = var.availability_zones[count.index]
 
-  tags = merge(
+tags = merge(
   local.common_tags,
   {
-    Name = "${var.project_name}-${var.environment}-app-${count.index + 1}"
-    Type = "private-app"
-
-    "kubernetes.io/role/internal-elb" = "1"
-
+    Name                                   = "${var.project_name}-${var.environment}-app-${count.index + 1}"
+    Type                                   = "private-app"
     "kubernetes.io/cluster/${var.project_name}-${var.environment}" = "shared"
+    "kubernetes.io/role/internal-elb"      = "1"
+
+    "karpenter.sh/discovery" = "${var.project_name}-${var.environment}"
   }
 )
 }
@@ -85,13 +85,17 @@ resource "aws_subnet" "private_db" {
 
   availability_zone = var.availability_zones[count.index]
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "${var.project_name}-${var.environment}-db-${count.index + 1}"
-      Type = "private-db"
-    }
-  )
+tags = merge(
+  local.common_tags,
+  {
+    Name                                   = "${var.project_name}-${var.environment}-app-${count.index + 1}"
+    Type                                   = "private-app"
+    "kubernetes.io/cluster/${var.project_name}-${var.environment}" = "shared"
+    "kubernetes.io/role/internal-elb"      = "1"
+
+    "karpenter.sh/discovery" = "${var.project_name}-${var.environment}"
+  }
+)
 }
 
 ### Internet Gateway

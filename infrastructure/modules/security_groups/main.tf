@@ -90,6 +90,8 @@ resource "aws_security_group" "eks_nodes" {
     local.common_tags,
     {
       Name = "${var.project_name}-${var.environment}-eks-node-sg"
+
+      "karpenter.sh/discovery" = "${var.project_name}-${var.environment}"
     }
   )
 }
