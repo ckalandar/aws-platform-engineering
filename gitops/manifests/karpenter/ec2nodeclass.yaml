@@ -1,4 +1,5 @@
 apiVersion: karpenter.k8s.aws/v1
+
 kind: EC2NodeClass
 
 metadata:
@@ -6,18 +7,18 @@ metadata:
 
 spec:
 
-  amiFamily: AL2023
-
   role: kk-platform-dev-karpenter-node
+
+  amiSelectorTerms:
+    - alias: al2023@latest
 
   subnetSelectorTerms:
     - tags:
-        kubernetes.io/cluster/kk-platform-dev: owned
+        karpenter.sh/discovery: kk-platform-dev
 
   securityGroupSelectorTerms:
     - tags:
-        Name: kk-platform-dev-eks-node-sg
+        karpenter.sh/discovery: kk-platform-dev
 
   tags:
-    Project: kk-platform
-    Environment: dev
+    karpenter.sh/discovery: kk-platform-dev

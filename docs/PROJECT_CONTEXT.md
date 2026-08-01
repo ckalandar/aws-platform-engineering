@@ -15935,3 +15935,445 @@ Paste the error.
 We'll mount a small writable /tmp volume if needed.
 
 Make these changes and deploy. Don't touch RBAC, NetworkPolicies, HPA, or Karpenter yet. We want a clean hardened workload first.
+
+Good. Your current structure is fine.
+
+Do not create another directory. You already have:
+
+gitops/prereqs/karpenter
+
+and your ArgoCD application is already pointing to it:
+
+path: gitops/prereqs/karpenter
+
+Leave that as-is.
+
+The next step is simply to make sure the prereqs directory contains the correct manifests.
+
+gitops/prereqs/karpenter/namespace.yaml
+apiVersion: v1
+kind: Namespace
+
+metadata:
+  name: karpenter
+gitops/prereqs/karpenter/serviceaccount.yaml
+
+Replace the role ARN with the output from Terraform.
+
+apiVersion: v1
+kind: ServiceAccount
+
+metadata:
+  name: karpenter
+  namespace: karpenter
+
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-karpenter-controller
+gitops/prereqs/karpenter/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+One important change in karpenter.yaml
+
+Your chart values are incomplete.
+
+Change:
+
+settings:
+  clusterName: kk-platform-dev
+
+to:
+
+settings:
+  clusterName: kk-platform-dev
+  clusterEndpoint: https://AF26FC10DEFD4735F4B0A57806441113.gr7.us-east-1.eks.amazonaws.com
+
+Use the endpoint from your Terraform output.
+
+After that:
+
+git add .
+git commit -m "add karpenter"
+git push
+
+Then watch:
+
+kubectl get applications -n argocd
+
+Wait until:
+
+karpenter-prereqs   Synced   Healthy
+karpenter           Synced   Healthy
+
+If Karpenter does not become Healthy, the next thing I'll need is:
+
+kubectl get pods -n karpenter
+kubectl logs -n karpenter deployment/karpenter --tail=100
+
+Don't change Terraform yet. First get the ArgoCD applications deployed successfully.
+
+kubectl describe application karpenter-prereqs -n argocd
+Name:         karpenter-prereqs
+Namespace:    argocd
+Labels:       <none>
+Annotations:  argocd.argoproj.io/tracking-id: platform-app:argoproj.io/Application:argocd/karpenter-prereqs
+API Version:  argoproj.io/v1alpha1
+Kind:         Application
+Metadata:
+  Creation Timestamp:  2026-08-01T17:53:35Z
+  Generation:          3
+  Resource Version:    1096399
+  UID:                 55289a8f-c61a-4c7a-b2fa-350238a4f4c4
+Spec:
+  Destination:
+    Namespace:  karpenter
+    Server:     https://kubernetes.default.svc
+  Project:      default
+  Source:
+    Path:             gitops/prereqs/karpenter
+    Repo URL:         https://github.com/ckalandar/aws-platform-engineering.git
+    Target Revision:  main
+  Sync Policy:
+    Automated:
+      Prune:      true
+      Self Heal:  true
+    Sync Options:
+      CreateNamespace=true
+Status:
+  Conditions:
+    Last Transition Time:  2026-08-01T17:53:35Z
+    Message:               Failed to load target state: failed to generate manifest for source 1 of 1: rpc error: code = Unknown desc = gitops/prereqs/karpenter: app path does not exist
+    Type:                  ComparisonError
+  Controller Namespace:    argocd
+  Health:
+    Last Transition Time:  2026-08-01T17:53:35Z
+    Status:                Healthy
+  Reconciled At:           2026-08-01T17:53:35Z
+  Resource Health Source:  appTree
+  Sync:
+    Compared To:
+      Destination:
+        Namespace:  karpenter
+        Server:     https://kubernetes.default.svc
+      Source:
+        Path:             gitops/prereqs/karpenter
+        Repo URL:         https://github.com/ckalandar/aws-platform-engineering.git
+        Target Revision:  main
+    Status:               Unknown
+Events:
+  Type    Reason           Age    From                           Message
+  ----    ------           ----   ----                           -------
+  Normal  ResourceUpdated  6m16s  argocd-application-controller  Updated sync status:  -> Unknown
+  Normal  ResourceUpdated  6m16s  argocd-application-controller  Updated health status:  -> Healthy
+kchilak@kalandars-MacBook-Pro aws-platform-engineering % kubectl describe application karpenter -n argocd
+Name:         karpenter
+Namespace:    argocd
+Labels:       <none>
+Annotations:  argocd.argoproj.io/tracking-id: platform-app:argoproj.io/Application:argocd/karpenter
+API Version:  argoproj.io/v1alpha1
+Kind:         Application
+Metadata:
+  Creation Timestamp:  2026-08-01T17:53:35Z
+  Generation:          3
+  Resource Version:    1096406
+  UID:                 f40fb180-1d81-4f76-a629-874a6babbfb3
+Spec:
+  Destination:
+    Namespace:  karpenter
+    Server:     https://kubernetes.default.svc
+  Project:      default
+  Sources:
+    Chart:  karpenter
+    Helm:
+      Values:  serviceAccount:
+  create: false
+  name: karpenter
+
+settings:
+  clusterName: kk-platform-dev
+  clusterEndpoint: https://AF26FC10DEFD4735F4B0A57806441113.gr7.us-east-1.eks.amazonaws.com
+
+    Repo URL:         oci://public.ecr.aws/karpenter
+    Target Revision:  1.6.1
+  Sync Policy:
+    Automated:
+      Prune:      true
+      Self Heal:  true
+    Sync Options:
+      CreateNamespace=true
+Status:
+  Conditions:
+    Last Transition Time:  2026-08-01T17:53:35Z
+    Message:               Failed to load target state: failed to generate manifest for source 1 of 1: rpc error: code = Unknown desc = failed to resolve revision "1.6.1": cannot get digest for revision 1.6.1: public.ecr.aws/karpenter:1.6.1: not found
+    Type:                  ComparisonError
+  Controller Namespace:    argocd
+  Health:
+    Last Transition Time:  2026-08-01T17:53:35Z
+    Status:                Healthy
+  Reconciled At:           2026-08-01T17:53:35Z
+  Resource Health Source:  appTree
+  Sync:
+    Compared To:
+      Destination:
+        Namespace:  karpenter
+        Server:     https://kubernetes.default.svc
+      Sources:
+        Chart:  karpenter
+        Helm:
+          Values:  serviceAccount:
+  create: false
+  name: karpenter
+
+settings:
+  clusterName: kk-platform-dev
+  clusterEndpoint: https://AF26FC10DEFD4735F4B0A57806441113.gr7.us-east-1.eks.amazonaws.com
+
+        Repo URL:         oci://public.ecr.aws/karpenter
+        Target Revision:  1.6.1
+    Status:               Unknown
+Events:
+  Type    Reason           Age    From                           Message
+  ----    ------           ----   ----                           -------
+  Normal  ResourceUpdated  6m50s  argocd-application-controller  Updated sync status:  -> Unknown
+  Normal  ResourceUpdated  6m50s  argocd-application-controller  Updated health status:  -> Healthy
+
+Now we have actual errors, which is progress.
+
+You have 2 separate failures.
+
+1. Karpenter prereqs path does not exist
+
+Error:
+
+gitops/prereqs/karpenter: app path does not exist
+
+ArgoCD is looking in GitHub and cannot find:
+
+gitops/prereqs/karpenter
+
+Verify locally:
+
+git status
+git add .
+git commit -m "add karpenter prereqs"
+git push origin main
+
+Then verify GitHub contains:
+
+gitops/prereqs/karpenter/
+├── namespace.yaml
+├── serviceaccount.yaml
+└── kustomization.yaml
+
+If not pushed, ArgoCD can't see it.
+
+2. Wrong Karpenter chart repository
+
+Error:
+
+public.ecr.aws/karpenter:1.6.1: not found
+
+Your current file:
+
+repoURL: oci://public.ecr.aws/karpenter
+chart: karpenter
+targetRevision: 1.6.1
+
+This is wrong.
+
+For Karpenter v1.x use:
+
+repoURL: oci://public.ecr.aws/karpenter/karpenter
+chart: karpenter
+targetRevision: 1.6.1
+
+Notice:
+
+/karpenter
+
+at the end of repoURL.
+
+Edit
+
+File:
+
+gitops/applications/platform/karpenter.yaml
+
+Change:
+
+repoURL: oci://public.ecr.aws/karpenter
+
+to
+
+repoURL: oci://public.ecr.aws/karpenter/karpenter
+
+Commit:
+
+git add .
+git commit -m "fix karpenter chart source"
+git push
+
+Then force refresh:
+
+argocd app get karpenter
+argocd app sync karpenter
+
+or
+
+kubectl annotate application karpenter \
+  -n argocd \
+  argocd.argoproj.io/refresh=hard --overwrite
+
+After pushing, run:
+
+kubectl get application -n argocd
+
+and show me the output.
+
+I expect the prereqs error to disappear first. The chart error may change to a values/configuration error, which we'll fix next.
+
+kubectl get pods -n karpenter
+NAME                         READY   STATUS    RESTARTS   AGE
+karpenter-55ffbf9564-mj4jf   1/1     Running   0          5m2s
+karpenter-55ffbf9564-tvzbd   1/1     Running   0          5m2s
+
+Perfect.
+
+Karpenter controller is deployed and healthy.
+
+karpenter-55ffbf9564-mj4jf   Running
+karpenter-55ffbf9564-tvzbd   Running
+
+Now move to the part that actually provisions nodes.
+
+Create these manifests.
+
+gitops/manifests/karpenter/ec2nodeclass.yaml
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+
+metadata:
+  name: default
+
+spec:
+
+  amiFamily: AL2023
+
+  role: kk-platform-dev-karpenter-node
+
+  subnetSelectorTerms:
+    - tags:
+        kubernetes.io/cluster/kk-platform-dev: owned
+
+  securityGroupSelectorTerms:
+    - tags:
+        Name: kk-platform-dev-eks-node-sg
+
+  tags:
+    Project: kk-platform
+    Environment: dev
+gitops/manifests/karpenter/nodepool.yaml
+apiVersion: karpenter.sh/v1
+kind: NodePool
+
+metadata:
+  name: default
+
+spec:
+
+  template:
+
+    spec:
+
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      requirements:
+
+        - key: kubernetes.io/arch
+          operator: In
+          values:
+            - amd64
+
+        - key: kubernetes.io/os
+          operator: In
+          values:
+            - linux
+
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values:
+            - on-demand
+
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - t3.large
+            - t3.xlarge
+
+  limits:
+    cpu: "20"
+
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 30s
+gitops/manifests/karpenter/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ec2nodeclass.yaml
+  - nodepool.yaml
+gitops/applications/platform/karpenter-resources.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: karpenter-resources
+  namespace: argocd
+
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+    targetRevision: main
+    path: gitops/manifests/karpenter
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: karpenter
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+Commit and push:
+
+git add .
+git commit -m "add karpenter nodepool"
+git push
+
+Then verify:
+
+kubectl get nodepool
+kubectl get ec2nodeclass
+
+Both should show:
+
+default
+
+After that we'll do the real test:
+
+Reduce EKS managed nodegroup to minimum.
+Create a workload that cannot fit.
+Watch Karpenter launch a new EC2 automatically.
+Watch Karpenter terminate it when load disappears.
+
+That's the point where we know autoscaling is actually working.
