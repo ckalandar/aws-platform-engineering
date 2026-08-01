@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: karpenter
+  namespace: argocd
+
+spec:
+  project: default
+
+  destination:
+    namespace: karpenter
+    server: https://kubernetes.default.svc
+
+  sources:
+
+    - repoURL: oci://public.ecr.aws/karpenter
+      chart: karpenter
+      targetRevision: 1.6.1
+
+      helm:
+        values: |
+          serviceAccount:
+            create: false
+            name: karpenter
+
+          settings:
+            clusterName: kk-platform-dev
+            clusterEndpoint: https://AF26FC10DEFD4735F4B0A57806441113.gr7.us-east-1.eks.amazonaws.com
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
