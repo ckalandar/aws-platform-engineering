@@ -12,9 +12,12 @@ public class PlatformController {
     @Value("${APP_USERNAME:unknown}")
     private String username;
 
+    private static final Logger log =
+            LoggerFactory.getLogger(PlatformController.class);
+
     @GetMapping("/")
     public Map<String, String> home() {
-
+        log.info("Home endpoint called");
         return Map.of(
                 "service", "platform-demo",
                 "environment", "dev",

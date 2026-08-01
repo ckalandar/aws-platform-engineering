@@ -13556,3 +13556,603 @@ Next:
 So you're thinking correctly: once the CI/CD pipeline is in place, you shouldn't need to run mvn package, docker build, docker push, or kubectl rollout restart manually except during initial development and troubleshooting.
 
 ==== 1 Aug ===
+Perfect. You've actually solved the problem.
+
+This output proves:
+
+{
+  "rootServiceName":"platform-demo",
+  "rootTraceName":"GET /"
+}
+
+Tempo contains traces from your Spring Boot application.
+
+And:
+
+curl http://localhost:3200/ready
+
+returns:
+
+ready
+
+So all of these are working:
+
+✅ Spring Boot instrumentation
+✅ OTEL exporter
+✅ OTLP endpoint (4318)
+✅ Tempo ingestion
+✅ Tempo storage
+✅ Tempo query API
+
+What happened?
+
+Earlier we were troubleshooting because:
+
+Tempo logs weren't obviously showing new traces
+No OTEL logs appeared in Spring Boot
+Actuator wasn't installed
+
+After fixing Actuator and redeploying, traces are clearly flowing.
+
+Your architecture is now:
+
+Spring Boot
+    ↓
+OpenTelemetry SDK
+    ↓
+OTLP HTTP (4318)
+    ↓
+Tempo
+    ↓
+Grafana
+Next step: Visualize traces in Grafana
+
+Open Grafana.
+
+Go to:
+
+Connections
+  → Data Sources
+
+Verify Tempo datasource exists.
+
+If not:
+
+Type: Tempo
+URL: http://tempo.tempo.svc.cluster.local:3200
+
+Save & Test.
+
+Search traces in Grafana
+
+Navigate:
+
+Explore
+
+Datasource:
+
+Tempo
+
+Search:
+
+service.name="platform-demo"
+
+or simply select:
+
+platform-demo
+
+from the service dropdown.
+
+You should see traces like:
+
+GET /
+GET /health
+GET /version
+Better Demo
+
+Right now every trace is:
+
+GET /
+duration = 1ms
+
+which isn't very interesting.
+
+Let's create a realistic distributed trace.
+
+Update your controller:
+
+@GetMapping("/slow")
+public Map<String, String> slow() throws Exception {
+
+    Thread.sleep(500);
+
+    return Map.of(
+            "service", "platform-demo",
+            "status", "completed");
+}
+
+Deploy.
+
+Generate traffic:
+
+for i in {1..20}
+do
+  curl https://springboot.dev.learnsystems.co/slow
+done
+
+Now Grafana will show:
+
+GET /slow
+duration ≈ 500ms
+
+which is much easier to inspect.
+
+Next maturity level
+
+You're currently collecting:
+
+Logs  -> Loki
+Metrics -> Prometheus
+Traces -> Tempo
+
+This is the complete Grafana observability stack.
+
+The next thing I would implement is trace ↔ log correlation.
+
+Goal:
+
+Error trace
+    ↓
+Click trace ID
+    ↓
+Jump directly to logs in Loki
+
+This is where observability starts becoming truly useful for troubleshooting microservices and Kubernetes workloads.
+
+You're actually at a good milestone now:
+
+EKS
+ ├─ ArgoCD
+ ├─ Spring Boot App
+ ├─ Loki Logs
+ ├─ Prometheus Metrics
+ ├─ Tempo Traces
+ └─ Grafana Visualization
+
+That's a production-style observability platform foundation.
+
+I can see the traces now 
+
+That's exactly what we wanted to see.
+
+From your screenshot:
+
+✅ Tempo datasource is working
+✅ Service platform-demo is discovered
+✅ Traces are searchable
+✅ Trace name is GET /
+✅ Grafana ↔ Tempo integration is working
+✅ Spring Boot → OTEL → Tempo pipeline is working
+
+At this point you have a complete observability pipeline:
+
+Spring Boot
+    ↓
+OpenTelemetry
+    ↓
+Tempo
+    ↓
+Grafana Explore
+What you've actually achieved
+
+Many engineers stop at:
+
+Application Logs → Loki
+
+You now have:
+
+Logs    → Loki
+Metrics → Prometheus
+Traces  → Tempo
+
+which is the full Grafana observability stack.
+
+Next thing I would do
+
+Your traces are currently:
+
+GET /
+duration ≈ 1 ms
+
+Not very interesting.
+
+Let's make traces useful.
+
+Add a slow endpoint:
+
+@GetMapping("/slow")
+public Map<String, String> slow() throws Exception {
+
+    Thread.sleep(500);
+
+    return Map.of(
+            "status", "success",
+            "endpoint", "slow");
+}
+
+Deploy.
+
+Generate traffic:
+
+for i in {1..20}
+do
+  curl https://springboot.dev.learnsystems.co/slow
+done
+
+Now in Tempo you'll see:
+
+GET /slow
+duration ≈ 500ms
+
+and can visually inspect latency.
+
+Real-world next step: Trace → Log correlation
+
+This is where observability becomes powerful.
+
+Today:
+
+Grafana
+ ├─ Logs (Loki)
+ ├─ Metrics (Prometheus)
+ └─ Traces (Tempo)
+
+Next goal:
+
+Trace
+  ↓
+Click TraceID
+  ↓
+Jump to related logs
+
+To achieve that we would:
+
+1. Add Trace ID to application logs
+
+For Spring Boot:
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},trace_id=%X{trace_id:-},span_id=%X{span_id:-}]"
+
+Example log:
+
+INFO [platform-demo,trace_id=8cda245fa484d...,span_id=123abc]
+Request received
+2. Send application logs to Loki
+
+Right now Alloy is collecting container logs.
+
+Once trace IDs are present in logs:
+
+Loki log
+   contains trace_id
+3. Configure Grafana derived fields
+
+In Loki datasource:
+
+trace_id
+
+maps to
+
+Tempo datasource
+
+Then Grafana automatically adds:
+
+View Trace
+
+button beside logs.
+
+Even more interesting
+
+After that we can create:
+
+Custom spans
+@WithSpan("database-call")
+public User getUser() {
+   ...
+}
+
+or
+
+Span span = tracer.spanBuilder("payment-processing").startSpan();
+
+Then Tempo shows:
+
+GET /checkout
+ ├── authentication
+ ├── payment-processing
+ ├── inventory-check
+ └── notification
+
+which is what you see in real production microservices.
+
+At this stage you've successfully completed the first full observability implementation on your EKS platform. The next logical milestone is correlating logs and traces, then introducing custom spans and multiple services so you can see distributed traces across service boundaries.
+
+lets proceed further
+
+Great. Now that traces are working, I wouldn't stop at "I can see traces in Grafana."
+
+The next objective is to build something that resembles a real production platform.
+
+Phase 1: Correlate Logs ↔ Traces
+
+Currently you have:
+
+Request
+  ↓
+Trace in Tempo
+
+Request
+  ↓
+Log in Loki
+
+But they're separate.
+
+In production, you want:
+
+Trace
+  ↓
+Click
+  ↓
+Related logs
+
+Log
+  ↓
+Click
+  ↓
+Related trace
+Update application.yaml
+
+Add:
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: platform-demo
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  pattern:
+    console: >
+      %d{yyyy-MM-dd HH:mm:ss}
+      [%thread]
+      %-5level
+      trace_id=%X{trace_id:-}
+      span_id=%X{span_id:-}
+      %logger{36}
+      - %msg%n
+Add logs to controller
+
+Example:
+
+package com.kk.platform;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@RestController
+public class PlatformController {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(PlatformController.class);
+
+    @GetMapping("/")
+    public Map<String,String> home() {
+
+        log.info("Home endpoint called");
+
+        return Map.of(
+            "service", "platform-demo",
+            "status", "healthy");
+    }
+}
+
+Deploy.
+
+Verify
+
+Generate traffic:
+
+curl https://springboot.dev.learnsystems.co/
+
+Then:
+
+kubectl logs -n springboot deployment/springboot
+
+You should see:
+
+INFO trace_id=8cda245fa484d...
+span_id=4a62f4d...
+Home endpoint called
+
+This is the same Trace ID stored in Tempo.
+
+Phase 2: Create Business Spans
+
+Auto instrumentation is useful, but production systems need custom spans.
+
+Add a service layer.
+
+PlatformService.java
+package com.kk.platform;
+
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import org.springframework.stereotype.Service;
+
+@Service
+public class PlatformService {
+
+    @WithSpan("config-read")
+    public String getConfig() throws Exception {
+
+        Thread.sleep(100);
+
+        return "success";
+    }
+}
+Controller
+@Autowired
+private PlatformService service;
+
+@GetMapping("/config")
+public Map<String,String> config() throws Exception {
+
+    service.getConfig();
+
+    return Map.of(
+        "service","platform-demo");
+}
+Result in Tempo
+
+Before:
+
+GET /config
+
+After:
+
+GET /config
+ └── config-read
+
+Now you're seeing application-level operations.
+
+Phase 3: Create a Second Service
+
+This is where observability becomes truly valuable.
+
+Current:
+
+Browser
+  ↓
+Spring Boot
+
+Next:
+
+Browser
+  ↓
+Frontend Service
+  ↓
+Backend Service
+
+Example:
+
+platform-demo
+    ↓
+inventory-service
+
+Each service gets its own trace spans.
+
+Tempo will show:
+
+GET /order
+ ├── platform-demo
+ └── inventory-service
+
+This is distributed tracing.
+
+Phase 4: Metrics from Application
+
+You already have Prometheus.
+
+Add:
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-registry-prometheus</artifactId>
+</dependency>
+
+Expose:
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+Verify:
+
+curl localhost:8080/actuator/prometheus
+
+You should see:
+
+http_server_requests_seconds
+jvm_memory_used_bytes
+jvm_gc_pause_seconds
+Phase 5: Build a Realistic Demo System
+
+Instead of one service, create:
+
+platform-demo
+inventory-service
+payment-service
+notification-service
+
+Deploy all through ArgoCD.
+
+Then:
+
+User Request
+   ↓
+platform-demo
+   ↓
+inventory-service
+   ↓
+payment-service
+   ↓
+notification-service
+
+Observability stack:
+
+Grafana
+├── Loki
+├── Prometheus
+└── Tempo
+
+Now you can demonstrate:
+
+Request flow
+Latency analysis
+Error tracking
+Service dependencies
+Trace-to-log correlation
+Metrics dashboards
+
+This is the point where your EKS platform starts looking like a production platform engineering environment rather than a single application demo.
+
+My recommendation is to tackle these next in order:
+
+Trace ↔ Log correlation
+Custom spans (@WithSpan)
+Prometheus metrics from Spring Boot
+Second microservice
+Service graph in Tempo
+Grafana dashboards and alerts
+
+Each step builds directly on what you've already working today.

@@ -28,3 +28,14 @@ otel:
   resource:
     attributes:
       service.name: platform-demo
+
+logging:
+  pattern:
+    console: >
+      %d{yyyy-MM-dd HH:mm:ss}
+      [%thread]
+      %-5level
+      trace_id=%X{trace_id:-}
+      span_id=%X{span_id:-}
+      %logger{36}
+      - %msg%n
