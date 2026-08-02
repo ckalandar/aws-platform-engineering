@@ -27,7 +27,3 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: springboot
-
-  egress:
-
-    - {}
