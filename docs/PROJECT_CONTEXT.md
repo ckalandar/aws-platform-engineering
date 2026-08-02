@@ -18963,3 +18963,256 @@ Prometheus metrics
 for automatic rollback.
 
 That will complete Progressive Delivery before we move into Istio Service Mesh.
+have done verification looks good proceed furhter
+
+Perfect.
+
+Now we move from:
+
+Deployment
+
+to
+
+Rollout
+
+which is the real Progressive Delivery pattern.
+
+Sprint 9.2 — Convert SpringBoot Deployment → Argo Rollout
+
+Current:
+
+Deployment
+  ↓
+Service
+  ↓
+Ingress
+
+Target:
+
+Rollout
+  ↓
+Stable Service
+  ↓
+Canary Service
+  ↓
+Ingress
+Step 1
+
+Create new directory
+
+gitops/manifests/springboot-rollouts
+File 1
+gitops/manifests/springboot-rollouts/rollout.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+
+metadata:
+ name: springboot
+ namespace: springboot
+
+spec:
+
+ replicas: 2
+
+ revisionHistoryLimit: 3
+
+ selector:
+   matchLabels:
+     app: springboot
+
+ template:
+
+   metadata:
+     labels:
+       app: springboot
+
+   spec:
+
+     serviceAccountName: default
+
+     containers:
+
+       - name: springboot
+
+         image: ghcr.io/ckalandar/platform-demo:latest
+
+         imagePullPolicy: Always
+
+         ports:
+           - containerPort: 8080
+
+         resources:
+
+           requests:
+             cpu: 100m
+             memory: 256Mi
+
+           limits:
+             cpu: 500m
+             memory: 512Mi
+
+         readinessProbe:
+
+           httpGet:
+             path: /actuator/health
+             port: 8080
+
+           initialDelaySeconds: 10
+
+         livenessProbe:
+
+           httpGet:
+             path: /actuator/health
+             port: 8080
+
+           initialDelaySeconds: 30
+
+ strategy:
+
+   canary:
+
+     canaryService: springboot-canary
+
+     stableService: springboot
+
+     steps:
+
+       - setWeight: 10
+
+       - pause:
+           duration: 60s
+
+       - setWeight: 50
+
+       - pause:
+           duration: 60s
+
+       - setWeight: 100
+File 2
+gitops/manifests/springboot-rollouts/service-stable.yaml
+apiVersion: v1
+kind: Service
+
+metadata:
+ name: springboot
+ namespace: springboot
+
+spec:
+
+ selector:
+   app: springboot
+
+ ports:
+   - port: 80
+     targetPort: 8080
+File 3
+gitops/manifests/springboot-rollouts/service-canary.yaml
+apiVersion: v1
+kind: Service
+
+metadata:
+ name: springboot-canary
+ namespace: springboot
+
+spec:
+
+ selector:
+   app: springboot
+
+ ports:
+   - port: 80
+     targetPort: 8080
+File 4
+gitops/manifests/springboot-rollouts/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+ - rollout.yaml
+ - service-stable.yaml
+ - service-canary.yaml
+Step 2
+
+Update workload application.
+
+Existing
+gitops/applications/workloads/springboot.yaml
+
+Currently points to:
+
+gitops/manifests/springboot
+
+Replace path with:
+
+path: gitops/manifests/springboot-rollouts
+Step 3
+
+Commit
+
+git add .
+git commit -m "convert springboot deployment to argo rollout"
+git push
+Step 4
+
+Verify
+
+kubectl get rollout -n springboot
+
+Expected:
+
+NAME         DESIRED   CURRENT   UP-TO-DATE   AVAILABLE
+springboot
+Step 5
+
+Watch rollout
+
+kubectl argo rollouts get rollout springboot \
+ -n springboot \
+ --watch
+
+If plugin missing:
+
+brew install argo-rollouts
+
+Expected:
+
+10%
+Pause
+
+50%
+Pause
+
+100%
+Healthy
+Step 6
+
+Dashboard
+
+kubectl port-forward svc/argo-rollouts-dashboard \
+-n argo-rollouts \
+3100:3100
+
+Open:
+
+http://localhost:3100
+
+You should see:
+
+springboot rollout
+revision history
+canary steps
+promotion status
+Important
+
+Do not delete your current gitops/manifests/springboot directory yet.
+
+Keep it as a backup until the rollout is healthy.
+
+After you've deployed this and verified:
+
+kubectl get rollout -n springboot
+kubectl argo rollouts get rollout springboot -n springboot
+
+send me the output.
+
+The next step will be automated rollback using Prometheus AnalysisTemplates, which is where Argo Rollouts becomes significantly more powerful than a normal Deployment.
