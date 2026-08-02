@@ -16,10 +16,8 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: springboot
 
   syncPolicy:
-
     automated:
       prune: true
       selfHeal: true

@@ -17397,3 +17397,505 @@ kubectl get sa -A -o yaml | grep eks.amazonaws.com/role-arn -B2 -A2
 We will inventory every IRSA-enabled workload and identify anything still using node credentials.
 
 That audit is the final task of this sprint before moving to Kyverno and admission
+I have done the validation of above verifications all look good kubectl get sa -A -o yaml | grep eks.amazonaws.com/role-arn -B2 -A2
+    annotations:
+      argocd.argoproj.io/tracking-id: external-secrets-prereqs:/ServiceAccount:external-secrets/external-secrets
+      eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-external-secrets
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"ServiceAccount","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"external-secrets-prereqs:/ServiceAccount:external-secrets/external-secrets","eks.amazonaws.com/role-arn":"arn:aws:iam::136863648867:role/kk-platform-dev-external-secrets"},"name":"external-secrets","namespace":"external-secrets"}}
+    creationTimestamp: "2026-07-30T11:05:05Z"
+    name: external-secrets
+--
+    annotations:
+      argocd.argoproj.io/tracking-id: karpenter-resources:/ServiceAccount:karpenter/karpenter
+      eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-karpenter-controller
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"ServiceAccount","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"karpenter-resources:/ServiceAccount:karpenter/karpenter","eks.amazonaws.com/role-arn":"arn:aws:iam::136863648867:role/kk-platform-dev-karpenter-controller"},"name":"karpenter","namespace":"karpenter"}}
+    creationTimestamp: "2026-08-01T18:08:17Z"
+    name: karpenter
+--
+    annotations:
+      argocd.argoproj.io/tracking-id: aws-load-balancer-controller-prereqs:/ServiceAccount:kube-system/aws-load-balancer-controller
+      eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-alb-controller
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"ServiceAccount","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"aws-load-balancer-controller-prereqs:/ServiceAccount:kube-system/aws-load-balancer-controller","eks.amazonaws.com/role-arn":"arn:aws:iam::136863648867:role/kk-platform-dev-alb-controller"},"name":"aws-load-balancer-controller","namespace":"kube-system"}}
+    creationTimestamp: "2026-07-29T07:27:32Z"
+    name: aws-load-balancer-controller
+--
+  metadata:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-ebs-csi-role
+    creationTimestamp: "2026-07-31T10:34:34Z"
+    labels:
+--
+    annotations:
+      argocd.argoproj.io/tracking-id: external-dns-prereqs:/ServiceAccount:kube-system/external-dns
+      eks.amazonaws.com/role-arn: arn:aws:iam::136863648867:role/kk-platform-dev-external-dns
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"ServiceAccount","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"external-dns-prereqs:/ServiceAccount:kube-system/external-dns","eks.amazonaws.com/role-arn":"arn:aws:iam::136863648867:role/kk-platform-dev-external-dns"},"name":"external-dns","namespace":"kube-system"}}
+    creationTimestamp: "2026-07-29T12:19:54Z"
+    name: external-dns
+
+Excellent. Your IRSA audit looks healthy.
+
+Current IRSA-enabled workloads:
+
+Component	Status
+AWS Load Balancer Controller	✅ IRSA
+External DNS	✅ IRSA
+External Secrets	✅ IRSA
+EBS CSI Driver	✅ IRSA
+Karpenter	✅ IRSA
+
+For the platform you've built so far, that's exactly what I'd expect.
+
+What We Just Achieved
+
+You now have:
+
+Network Segmentation
+SpringBoot Namespace
+├── Default Deny
+├── Allow DNS
+├── Allow Prometheus
+└── Allow Ingress
+Workload Identity
+Dedicated ServiceAccount
+No Kubernetes API Token
+No Cluster Permissions
+AWS Identity
+IRSA
+├── ALB Controller
+├── External DNS
+├── External Secrets
+├── EBS CSI
+└── Karpenter
+
+This is already significantly more mature than many production EKS environments.
+
+I Would Not Move To Service Mesh Yet
+
+Most engineers install Istio too early.
+
+Before introducing:
+
+Istio
+Linkerd
+mTLS
+Traffic Policies
+
+you should first have a policy engine enforcing security standards.
+
+Otherwise:
+
+Developer deploys:
+  privileged: true
+
+and the cluster accepts it.
+
+That's where admission control comes in.
+
+Next Sprint
+Runtime Security
+1. Kyverno
+
+Install:
+
+Kyverno
+
+via GitOps.
+
+2. Enforce Non-Root Containers
+
+Block:
+
+securityContext:
+  runAsUser: 0
+3. Require Resource Limits
+
+Block:
+
+containers:
+  - name: app
+
+without:
+
+resources:
+  requests:
+  limits:
+4. Block Latest Tags
+
+Block:
+
+image: nginx:latest
+
+Allow:
+
+image: nginx:1.29.0
+5. Require ReadOnlyRootFilesystem
+
+Require:
+
+securityContext:
+  readOnlyRootFilesystem: true
+6. Require Labels
+
+Require:
+
+app:
+team:
+environment:
+
+on every workload.
+
+Why This Order?
+
+Real platform maturity looks like:
+
+GitOps
+↓
+Monitoring
+↓
+Network Policies
+↓
+RBAC
+↓
+IRSA
+↓
+Admission Control
+↓
+Service Mesh
+↓
+Progressive Delivery
+↓
+Internal Developer Platform
+
+Not:
+
+GitOps
+↓
+Istio
+↓
+Chaos
+↓
+Complexity
+
+which is unfortunately how many teams do it.
+
+Recommended Next Implementation
+
+The next concrete milestone I'd implement is:
+
+Sprint 4.2
+├── Kyverno
+├── Non-root policy
+├── No latest-tag policy
+├── Resource limits policy
+├── ReadOnlyRootFilesystem policy
+└── Required labels policy
+
+Once those are enforced cluster-wide, then we move to:
+
+Sprint 5
+├── Istio
+├── mTLS
+├── AuthorizationPolicy
+├── PeerAuthentication
+└── Traffic Management
+
+At that point your platform starts looking like a real enterprise platform rather than just an EKS cluster with applications deployed on it.
+
+lets proceed further, like how you gave the step wise files and paths along with code follow same from going forward
+
+Good. Based on your validation, IRSA adoption is already in a healthy state:
+
+✅ External Secrets → IRSA
+✅ External DNS → IRSA
+✅ AWS Load Balancer Controller → IRSA
+✅ EBS CSI Driver → IRSA
+✅ Karpenter → IRSA (even if provisioning isn't working yet)
+
+That completes Sprint 3 — IRSA Audit.
+
+Next Sprint: RBAC Hardening
+
+Current state:
+
+Most Helm charts install cluster-admin style permissions because it's easier.
+
+A platform engineer should reduce permissions to least privilege.
+
+Goal
+
+Create dedicated roles for:
+
+Developers
+Observability Team
+Platform Admins
+
+Instead of everyone being cluster-admin.
+
+Folder Structure
+
+Create:
+
+gitops/
+└── manifests/
+    └── security/
+        ├── namespace-admin-role.yaml
+        ├── namespace-admin-binding.yaml
+        ├── observability-role.yaml
+        ├── observability-binding.yaml
+        ├── readonly-role.yaml
+        ├── readonly-binding.yaml
+        └── kustomization.yaml
+File 1
+gitops/manifests/security/readonly-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+
+metadata:
+  name: platform-readonly
+
+rules:
+
+- apiGroups: [""]
+  resources:
+    - pods
+    - services
+    - configmaps
+    - endpoints
+    - namespaces
+  verbs:
+    - get
+    - list
+    - watch
+
+- apiGroups: ["apps"]
+  resources:
+    - deployments
+    - replicasets
+    - statefulsets
+    - daemonsets
+  verbs:
+    - get
+    - list
+    - watch
+
+- apiGroups: ["networking.k8s.io"]
+  resources:
+    - ingresses
+  verbs:
+    - get
+    - list
+    - watch
+File 2
+gitops/manifests/security/readonly-binding.yaml
+
+Replace email with your IAM mapped user/group later.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+
+metadata:
+  name: platform-readonly
+
+subjects:
+
+- kind: Group
+  name: developers
+  apiGroup: rbac.authorization.k8s.io
+
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-readonly
+File 3
+gitops/manifests/security/namespace-admin-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+
+metadata:
+  name: namespace-admin
+  namespace: springboot
+
+rules:
+
+- apiGroups: [""]
+
+  resources:
+    - pods
+    - services
+    - configmaps
+    - secrets
+
+  verbs:
+    - "*"
+
+- apiGroups: ["apps"]
+
+  resources:
+    - deployments
+    - replicasets
+
+  verbs:
+    - "*"
+
+- apiGroups: ["autoscaling"]
+
+  resources:
+    - horizontalpodautoscalers
+
+  verbs:
+    - "*"
+File 4
+gitops/manifests/security/namespace-admin-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+
+metadata:
+  name: namespace-admin
+  namespace: springboot
+
+subjects:
+
+- kind: Group
+  name: app-team
+
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: namespace-admin
+File 5
+gitops/manifests/security/observability-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+
+metadata:
+  name: observability-admin
+
+rules:
+
+- apiGroups: ["monitoring.coreos.com"]
+  resources:
+    - servicemonitors
+    - prometheusrules
+
+  verbs:
+    - "*"
+
+- apiGroups: [""]
+  resources:
+    - pods
+    - services
+
+  verbs:
+    - get
+    - list
+    - watch
+File 6
+gitops/manifests/security/observability-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+
+metadata:
+  name: observability-admin
+
+subjects:
+
+- kind: Group
+  name: observability-team
+
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: observability-admin
+File 7
+gitops/manifests/security/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - readonly-role.yaml
+  - readonly-binding.yaml
+  - namespace-admin-role.yaml
+  - namespace-admin-binding.yaml
+  - observability-role.yaml
+  - observability-binding.yaml
+ArgoCD Application
+
+Create:
+
+gitops/applications/platform/security.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: security
+  namespace: argocd
+
+spec:
+
+  project: default
+
+  source:
+    repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+    targetRevision: main
+    path: gitops/manifests/security
+
+  destination:
+    server: https://kubernetes.default.svc
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+Since your Platform AppSet already watches:
+
+gitops/applications/platform/
+
+just commit:
+
+git add .
+git commit -m "add rbac hardening"
+git push
+
+ArgoCD will create it automatically.
+
+Validation
+kubectl get clusterrole | grep platform
+kubectl get clusterrolebinding | grep platform
+kubectl get role -n springboot
+kubectl get rolebinding -n springboot
+After RBAC
+
+The next sprint is the most important security sprint in the platform roadmap:
+
+Sprint 5 — Network Policies (Zero Trust)
+
+We'll implement:
+
+default-deny
+↓
+allow-dns
+↓
+allow-ingress-from-alb
+↓
+allow-app-to-observability
+↓
+deny everything else
+
+This is where your EKS platform starts behaving like a production platform rather than a default Kubernetes cluster.
+
+After that we move into:
+
+Service Mesh (Istio)
+↓
+mTLS
+↓
+Argo Rollouts
+↓
+Backstage IDP
+
+which becomes the Platform Engineering phase.
