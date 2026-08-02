@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - alert-rules.yaml
+
+configMapGenerator:
+  - name: grafana-dashboard-platform
+    files:
+      - platform-overview.json=dashboards/platform-overview.json
+
+  - name: grafana-dashboard-springboot
+    files:
+      - springboot.json=dashboards/springboot.json
+
+generatorOptions:
+  disableNameSuffixHash: true

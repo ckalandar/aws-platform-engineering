@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-springboot
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+
+data:
+  springboot.json: |
+    {
+      "annotations":{"list":[]},
+      "editable":true,
+      "panels":[
+        {
+          "id":1,
+          "title":"Request Rate",
+          "type":"timeseries",
+          "targets":[
+            {
+              "expr":"sum(rate(http_server_requests_seconds_count[5m]))"
+            }
+          ]
+        },
+        {
+          "id":2,
+          "title":"P95 Latency",
+          "type":"timeseries",
+          "targets":[
+            {
+              "expr":"histogram_quantile(0.95,sum(rate(http_server_requests_seconds_bucket[5m])) by (le))"
+            }
+          ]
+        },
+        {
+          "id":3,
+          "title":"5xx Errors",
+          "type":"timeseries",
+          "targets":[
+            {
+              "expr":"sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m]))"
+            }
+          ]
+        },
+        {
+          "id":4,
+          "title":"JVM Heap",
+          "type":"timeseries",
+          "targets":[
+            {
+              "expr":"jvm_memory_used_bytes{area=\"heap\"}"
+            }
+          ]
+        }
+      ],
+      "schemaVersion":39,
+      "title":"SpringBoot Application",
+      "version":1
+    }

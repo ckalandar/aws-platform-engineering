@@ -16,6 +16,34 @@ grafana:
 
     hosts:
       - grafana.dev.learnsystems.co
+
+  sidecar:
+
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+
+    datasources:
+      enabled: true
+
+  dashboardProviders:
+
+    dashboardproviders.yaml:
+
+      apiVersion: 1
+
+      providers:
+
+        - name: default
+          orgId: 1
+          folder: Platform
+          type: file
+          disableDeletion: false
+          editable: true
+
+          options:
+            path: /var/lib/grafana/dashboards/default
+
   additionalDataSources:
 
     - name: Loki
@@ -28,7 +56,9 @@ grafana:
       type: tempo
       access: proxy
       url: http://tempo.tempo.svc.cluster.local:3200
+
 prometheus:
+
   prometheusSpec:
 
     retention: 15d
@@ -43,6 +73,7 @@ prometheus:
             - ReadWriteOnce
 
           resources:
+
             requests:
               storage: 20Gi
 
