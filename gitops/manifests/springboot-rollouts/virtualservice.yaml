@@ -1,0 +1,27 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+
+metadata:
+  name: springboot
+  namespace: springboot
+
+spec:
+  gateways:
+    - springboot-gateway
+
+  hosts:
+    - springboot.dev.learnsystems.co
+
+  http:
+
+    - name: primary
+
+      route:
+
+        - destination:
+            host: springboot
+          weight: 100
+
+        - destination:
+            host: springboot-canary
+          weight: 0

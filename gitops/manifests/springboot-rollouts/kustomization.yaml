@@ -9,3 +9,5 @@ resources:
   - ingress.yaml
   - servicemonitor.yaml
   - hpa.yaml
+  - istio-gateway.yaml
+  - virtualservice.yaml

@@ -67,12 +67,22 @@ spec:
     canary:
 
       canaryService: springboot-canary
-
       stableService: springboot
+
+      trafficRouting:
+
+        istio:
+
+          virtualService:
+
+            name: springboot
+
+            routes:
+              - primary
 
       steps:
 
-        - setWeight: 10
+        - setWeight: 20
 
         - pause:
             duration: 60s
