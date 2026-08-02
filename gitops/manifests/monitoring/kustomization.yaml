@@ -6,14 +6,14 @@ resources:
   - grafana-dashboard-platform.yaml
   - grafana-dashboard-springboot.yaml
 
-configMapGenerator:
-  - name: grafana-dashboard-platform
-    files:
-      - platform-overview.json=dashboards/platform-overview.json
+# configMapGenerator:
+#   - name: grafana-dashboard-platform
+#     files:
+#       - platform-overview.json=dashboards/platform-overview.json
 
-  - name: grafana-dashboard-springboot
-    files:
-      - springboot.json=dashboards/springboot.json
+#   - name: grafana-dashboard-springboot
+#     files:
+#       - springboot.json=dashboards/springboot.json
 
-generatorOptions:
-  disableNameSuffixHash: true
+# generatorOptions:
+#   disableNameSuffixHash: true
