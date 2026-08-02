@@ -3,6 +3,8 @@ kind: Kustomization
 
 resources:
   - alert-rules.yaml
+  - grafana-dashboard-platform.yaml
+  - grafana-dashboard-springboot.yaml
 
 configMapGenerator:
   - name: grafana-dashboard-platform
