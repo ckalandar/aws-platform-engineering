@@ -6,7 +6,6 @@ metadata:
   namespace: argocd
 
 spec:
-
   project: default
 
   source:
@@ -16,6 +15,8 @@ spec:
 
     helm:
       values: |
+        labels:
+          istio.io/rev: default
 
         service:
           type: LoadBalancer
@@ -25,7 +26,6 @@ spec:
     namespace: istio-system
 
   syncPolicy:
-
     automated:
       prune: true
       selfHeal: true
