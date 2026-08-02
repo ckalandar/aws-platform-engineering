@@ -19216,3 +19216,482 @@ kubectl argo rollouts get rollout springboot -n springboot
 send me the output.
 
 The next step will be automated rollback using Prometheus AnalysisTemplates, which is where Argo Rollouts becomes significantly more powerful than a normal Deployment.
+Yes. That's actually the fastest and cleanest approach.
+
+Since your platform is already using ECR, let's inspect the repository and tags instead of trying to recover them from Kubernetes history.
+
+Run:
+
+aws ecr describe-repositories
+
+Look for something like:
+
+platform-demo
+springboot
+kk-platform-app
+
+Then list images:
+
+aws ecr list-images \
+  --repository-name <repo-name>
+
+Or even better:
+
+aws ecr describe-images \
+  --repository-name <repo-name>
+
+Example output:
+
+imageTags:
+  - latest
+
+imageTags:
+  - v1.0.0
+
+imageTags:
+  - build-123
+
+If you have multiple repos:
+
+aws ecr describe-repositories \
+  --query 'repositories[*].repositoryName'
+
+Then check each one.
+
+Even faster, search your GitHub Actions:
+
+grep -R "docker push" .github/workflows
+
+or
+
+grep -R "ECR_REPOSITORY" .github/workflows
+
+because whatever your pipeline pushes is exactly what the workload should consume.
+
+Once you find the repo, your rollout image should look something like:
+
+image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:latest
+
+instead of:
+
+image: ghcr.io/ckalandar/platform-demo:latest
+
+which is currently failing.
+
+Run these and paste the output:
+
+aws ecr describe-repositories
+
+and
+
+aws ecr describe-images \
+  --repository-name <repo-name>
+
+We'll update gitops/manifests/springboot-rollouts/rollout.yaml with the exact image and get the rollout healthy before moving on.
+
+aws ecr describe-images \
+  --repository-name platform-demo
+{
+    "imageDetails": [
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:a1a4309a34d5667767ce68438ee82fecf7be1676c4660c57d5abfabcf28c2b73",
+            "imageSizeInBytes": 1421,
+            "imagePushedAt": "2026-07-29T22:20:47.325000+05:30",
+            "imageManifestMediaType": "application/vnd.oci.image.manifest.v1+json",
+            "artifactMediaType": "application/vnd.oci.image.config.v1+json",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:9c0c9982731ac0c35cc3fd87d0b8e630cb44e18e33b61120756560d8ec90ab4a",
+            "imageSizeInBytes": 133740732,
+            "imagePushedAt": "2026-07-29T22:20:47.431000+05:30",
+            "imageManifestMediaType": "application/vnd.oci.image.manifest.v1+json",
+            "artifactMediaType": "application/vnd.oci.image.config.v1+json",
+            "lastRecordedPullTime": "2026-07-29T22:20:47.913000+05:30",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:ea7033f342b8c100a37d69ee189c4756883c922f442614f05ac55e58c7667077",
+            "imageTags": [
+                "1.0.0"
+            ],
+            "imageSizeInBytes": 133740732,
+            "imagePushedAt": "2026-07-29T22:20:48.179000+05:30",
+            "imageManifestMediaType": "application/vnd.oci.image.index.v1+json",
+            "lastRecordedPullTime": "2026-07-29T22:21:00.603000+05:30",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:316b5b961b4362abdeb5ef613311e003bf2aab7a9232d3b47205c53ab483b24a",
+            "imageTags": [
+                "b67b86c333347d00e7828fe334e5eaa651608343"
+            ],
+            "imageSizeInBytes": 176806605,
+            "imagePushedAt": "2026-08-01T17:00:15.968000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "lastRecordedPullTime": "2026-08-01T17:02:36.624000+05:30",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:86e20aaa00a09e1df18532549f9770994b37de22ec465c4598957c4d4fb09dbf",
+            "imageTags": [
+                "4cc53bf1192dfb386a03d125a4dcd7142cd6e18a"
+            ],
+            "imageSizeInBytes": 133741169,
+            "imagePushedAt": "2026-07-30T18:13:53.417000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "lastRecordedPullTime": "2026-07-31T17:55:04.946000+05:30",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:e8e878bc452cdb4cf4c5466fba3af6d784ee17d6de6f1b97d5187f4cfa0a9c76",
+            "imageTags": [
+                "72d9736332da46ab55de606a15ec9c13677e958f"
+            ],
+            "imageSizeInBytes": 139639615,
+            "imagePushedAt": "2026-07-31T22:53:47.640000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "lastRecordedPullTime": "2026-07-31T22:58:55.395000+05:30",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:93feadf6247db9af7bb97123c8583b426e7ac8008e5369f812e1c03d9a7720fd",
+            "imageTags": [
+                "dd148fc304854813cf19b504cd9076eb02043ef9"
+            ],
+            "imageSizeInBytes": 145821460,
+            "imagePushedAt": "2026-08-01T12:45:56.411000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "lastRecordedPullTime": "2026-08-01T12:53:33.336000+05:30",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:df99690a7024e9012e04351e7f155917583802c24be50eb1533d8cc0065c609d",
+            "imageTags": [
+                "7ba4392d0af303fbbef0eafd555894e10a1c44f1"
+            ],
+            "imageSizeInBytes": 145821567,
+            "imagePushedAt": "2026-08-01T15:13:30.900000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "lastRecordedPullTime": "2026-08-01T15:14:05.665000+05:30",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:eceb45d4cdd3adbbb866a752eda00cb3a50383b9a0c73dc6e3c06b5971e99b46",
+            "imageTags": [
+                "8f7dece380c878d46fd0de40a52629f71084f81a"
+            ],
+            "imageSizeInBytes": 141892243,
+            "imagePushedAt": "2026-08-01T11:31:11.995000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "lastRecordedPullTime": "2026-08-01T11:35:22.098000+05:30",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:73c0ef6d40d3f08de7322baf8e6e0fbaf7fef8d06158d56638c632747171d542",
+            "imageTags": [
+                "90852d5d2f0eb6cc7f15d77be3e45718df230ab2"
+            ],
+            "imageSizeInBytes": 145821554,
+            "imagePushedAt": "2026-08-01T15:23:12.151000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "lastRecordedPullTime": "2026-08-01T15:26:36.283000+05:30",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:fd1efe908bde3d86c96927da4b8a4cedb09a11f70b8f46a690a268730d332803",
+            "imageTags": [
+                "cd805d0389c253af98f184c5f3cb846806547667"
+            ],
+            "imageSizeInBytes": 133740871,
+            "imagePushedAt": "2026-07-30T12:42:57.262000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:64ac885ce9773f0c1656a98c8eeb3499aa87aad3ab3d1605dfb42a8057999fc7",
+            "imageTags": [
+                "0e4c175e328f2a86305e8949e06b46c6e2ce6344"
+            ],
+            "imageSizeInBytes": 133740883,
+            "imagePushedAt": "2026-07-30T12:52:56.903000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:fe02c143c8debced6b63cd7c61001ebe398c47409ad8544730872a696c3dc585",
+            "imageTags": [
+                "bc8010e0f4be9b492121d54de406745edf45cd65"
+            ],
+            "imageSizeInBytes": 133740870,
+            "imagePushedAt": "2026-07-30T12:49:17.444000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "imageStatus": "ACTIVE"
+        },
+        {
+            "registryId": "136863648867",
+            "repositoryName": "platform-demo",
+            "imageDigest": "sha256:c0a4d2aaace792211589d2651403183d5823cdbd7d69dd11d302be5a6e2da8cd",
+            "imageTags": [
+                "d8e7d0bae551e2d848a4c3d53c34c27a7090d0b4"
+            ],
+            "imageSizeInBytes": 133740880,
+            "imagePushedAt": "2026-07-30T13:07:03.361000+05:30",
+            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+            "lastRecordedPullTime": "2026-07-30T13:10:48.757000+05:30",
+            "imageStatus": "ACTIVE"
+        }
+    ]
+}
+
+Perfect. We found the problem.
+
+Your application image is in ECR:
+
+Repository: platform-demo
+Account: 136863648867
+Region: us-east-1
+
+And Kubernetes is trying to pull:
+
+ghcr.io/ckalandar/platform-demo:latest
+
+which doesn't exist publicly for your cluster.
+
+Fix rollout.yaml
+
+Update:
+
+image: ghcr.io/ckalandar/platform-demo:latest
+
+to:
+
+image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+
+or better, use one of your recent Git commit tags:
+
+image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:b67b86c333347d00e7828fe334e5eaa651608343
+
+I would use the most recently pulled one:
+
+image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:b67b86c333347d00e7828fe334e5eaa651608343
+Verify EKS can pull from ECR
+
+Your nodes should already be able to because the app was running before.
+
+Check:
+
+kubectl get nodes
+
+Then:
+
+kubectl describe node <node-name> | grep -A10 Roles
+
+Or easier:
+
+aws iam list-attached-role-policies \
+  --role-name kk-platform-dev-eks-node-group
+
+You should see:
+
+AmazonEC2ContainerRegistryReadOnly
+
+Most likely this is already present.
+
+Commit
+git add .
+git commit -m "fix: use ECR image for rollout"
+git push
+
+Wait for ArgoCD sync.
+
+Verify
+kubectl get pods -n springboot
+
+Expected:
+
+springboot-xxxxx   1/1 Running
+springboot-yyyyy   1/1 Running
+
+Then:
+
+kubectl get rollout -n springboot
+
+Expected:
+
+NAME       DESIRED   CURRENT   UP-TO-DATE   AVAILABLE
+springboot 2         2         2            2
+After rollout is healthy
+
+We continue with:
+
+PHASE 6 — Platform Engineering
+Sprint 1
+
+✅ Argo Rollouts (currently fixing)
+
+Sprint 2
+
+Service Mesh
+
+We'll implement:
+
+gitops/manifests/istio/
+Istio base
+Istiod
+Gateway API integration
+PeerAuthentication (mTLS)
+AuthorizationPolicies
+Traffic policies
+
+This is where your platform starts becoming a real enterprise platform.
+
+Once the rollout pods are healthy, show me:
+
+kubectl get rollout -n springboot
+kubectl get pods -n springboot
+
+and we'll move directly into the Service Mesh implementation with the same step-by-step file/path structure we've been using.
+
+updating the image in rollout.yaml is this not hardcoding?
+
+Yes, and that's exactly the discussion we should have before proceeding.
+
+What I suggested was a quick recovery fix to get the rollout healthy. For a production-grade GitOps platform, hardcoding image tags inside rollout.yaml is not the end state.
+
+You have three common approaches:
+
+Option 1 — Hardcoded tag in Git (what we use temporarily)
+image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+
+Pros:
+
+Simple
+Reproducible
+Git is source of truth
+
+Cons:
+
+Every release requires a Git commit
+Option 2 — GitOps image automation (recommended)
+
+Keep Rollout manifest like:
+
+image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:8f7dece380c878d46fd0de40a52629f71084f81a
+
+GitHub Actions builds image:
+
+platform-demo:<git-sha>
+
+Then automatically updates GitOps repo:
+
+image: platform-demo:b67b86c333347d00e7828fe334e5eaa651608343
+
+and commits:
+
+chore: bump platform-demo image
+
+ArgoCD syncs automatically.
+
+This is how many production GitOps environments work.
+
+Option 3 — ArgoCD Image Updater (best long-term)
+
+Install:
+
+ArgoCD Image Updater
+
+Then annotate the Application:
+
+annotations:
+  argocd-image-updater.argoproj.io/image-list: \
+    platform-demo=136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo
+
+Image Updater:
+
+Watches ECR
+Detects new tag
+Updates Application
+Triggers deployment
+
+No GitHub workflow modification required.
+
+What I would do on your platform
+
+Given your roadmap:
+
+Network Policies ✅
+RBAC Hardening ✅
+IRSA Audit ✅
+Argo Rollouts 🚧
+Service Mesh
+IDP
+
+I would:
+
+Right now
+
+Use:
+
+image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:1.0.0
+
+just to restore service.
+
+Later (during Platform Engineering phase)
+
+Add:
+
+ArgoCD Image Updater
+
+This is actually a platform-engineering capability and fits naturally alongside:
+
+Argo Rollouts
+Service Mesh
+Self-Service Platform
+Golden Paths
+
+So my recommendation is:
+
+Fix rollout immediately with a known-good ECR tag.
+Verify Rollouts work.
+Build Service Mesh.
+Add ArgoCD Image Updater as part of the Platform Engineering phase and remove the manual image management concern entirely.
+
+That keeps us moving through the roadmap instead of getting blocked by release automation details before the rollout feature itself is validated.
