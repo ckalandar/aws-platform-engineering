@@ -18234,3 +18234,508 @@ Sprint 6
 └── ReadOnlyRootFilesystem
 
 Kyverno should come before Istio because policy enforcement is a more fundamental platform control than service mesh.
+
+We already have enough evidence.
+
+Notice this command:
+
+kubectl get ds aws-node -n kube-system -o yaml | grep ENABLE_NETWORK_POLICY
+
+returned nothing.
+
+That is the smoking gun.
+
+You are running:
+
+aws-node
+
+which means AWS VPC CNI, but Network Policy enforcement is not enabled.
+
+So currently:
+
+Kubernetes NetworkPolicy objects exist
+↓
+API server stores them
+↓
+AWS VPC CNI ignores them
+↓
+Traffic is not blocked
+
+This is why:
+
+wget google.com
+
+still works from the SpringBoot pods even though the policies are correct.
+
+Verify One Last Time
+
+Run:
+
+kubectl describe daemonset aws-node -n kube-system | grep -A5 ENABLE_NETWORK_POLICY
+
+or:
+
+kubectl -n kube-system get daemonset aws-node \
+-o jsonpath='{.spec.template.spec.containers[0].env}'
+
+You should not see:
+
+ENABLE_NETWORK_POLICY=true
+Production Options
+
+For EKS you have 3 realistic choices:
+
+Option 1 (Recommended)
+
+Enable AWS Network Policy support.
+
+AWS supports this through VPC CNI newer releases.
+
+Check your version:
+
+kubectl describe ds aws-node -n kube-system | grep Image
+
+If you're on a recent release, we can enable it.
+
+Option 2
+
+Install Cilium.
+
+Cilium
++
+eBPF
++
+Network Policies
++
+Observability
++
+Service Mesh later
+
+This is what many modern platform teams are doing.
+
+Option 3
+
+Install Calico only for policy enforcement.
+
+Works fine, but if we're heading toward:
+
+Service Mesh
+Progressive Delivery
+Platform Engineering
+
+I'd rather use Cilium than introduce Calico now.
+
+My Recommendation
+
+Given your roadmap:
+
+✓ EKS
+✓ ArgoCD
+✓ Prometheus
+✓ Grafana
+✓ Loki
+✓ Tempo
+✓ External Secrets
+✓ IRSA
+✓ RBAC
+
+Next:
+Service Mesh
+Progressive Delivery
+IDP
+
+I would not spend more time patching AWS VPC CNI policies.
+
+I'd do:
+
+Sprint 8
+========
+Install Cilium
+Enable Network Policies
+Validate Zero Trust
+
+Then:
+
+Sprint 9
+========
+Kyverno
+
+Then:
+
+Sprint 10
+========
+Argo Rollouts
+
+Then:
+
+Sprint 11
+========
+Backstage IDP
+
+At that point you'll have something very close to a real Platform Engineering environment.
+
+Before we move on, run:
+
+kubectl describe ds aws-node -n kube-system | grep Image
+
+and paste the output. I want to see which VPC CNI version you're running so we can decide whether enabling AWS Network Policy is a 5-minute change or whether Cilium is the cleaner path.
+
+kubectl -n kube-system get daemonset aws-node \
+-o jsonpath='{.spec.template.spec.containers[0].env}'
+[{"name":"ADDITIONAL_ENI_TAGS","value":"{}"},{"name":"ANNOTATE_POD_IP","value":"false"},{"name":"AWS_VPC_CNI_NODE_PORT_SUPPORT","value":"true"},{"name":"AWS_VPC_ENI_MTU","value":"9001"},{"name":"AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG","value":"false"},{"name":"AWS_VPC_K8S_CNI_EXTERNALSNAT","value":"false"},{"name":"AWS_VPC_K8S_CNI_LOGLEVEL","value":"DEBUG"},{"name":"AWS_VPC_K8S_CNI_LOG_FILE","value":"/host/var/log/aws-routed-eni/ipamd.log"},{"name":"AWS_VPC_K8S_CNI_RANDOMIZESNAT","value":"prng"},{"name":"AWS_VPC_K8S_CNI_VETHPREFIX","value":"eni"},{"name":"AWS_VPC_K8S_PLUGIN_LOG_FILE","value":"/var/log/aws-routed-eni/plugin.log"},{"name":"AWS_VPC_K8S_PLUGIN_LOG_LEVEL","value":"DEBUG"},{"name":"CLUSTER_ENDPOINT","value":"https://AF26FC10DEFD4735F4B0A57806441113.gr7.us-east-1.eks.amazonaws.com"},{"name":"CLUSTER_NAME","value":"kk-platform-dev"},{"name":"DISABLE_INTROSPECTION","value":"false"},{"name":"DISABLE_METRICS","value":"false"},{"name":"DISABLE_NETWORK_RESOURCE_PROVISIONING","value":"false"},{"name":"ENABLE_IMDS_ONLY_MODE","value":"false"},{"name":"ENABLE_IPv4","value":"true"},{"name":"ENABLE_IPv6","value":"false"},{"name":"ENABLE_MULTI_NIC","value":"false"},{"name":"ENABLE_POD_ENI","value":"false"},{"name":"ENABLE_PREFIX_DELEGATION","value":"false"},{"name":"ENABLE_SUBNET_DISCOVERY","value":"true"},{"name":"NETWORK_POLICY_ENFORCING_MODE","value":"standard"},{"name":"VPC_CNI_VERSION","value":"v1.22.3"},{"name":"VPC_ID","value":"vpc-0c52e44ef7fe0b245"},{"name":"WARM_ENI_TARGET","value":"1"},{"name":"WARM_PREFIX_TARGET","value":"1"},{"name":"MY_NODE_NAME","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"spec.nodeName"}}},{"name":"MY_POD_NAME","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"metadata.name"}}}]%                                                                                         kchilak@kalandars-MBP aws-platform-engineering % kubectl -n kube-system get daemonset aws-node \
+-o jsonpath='{.spec.template.spec.containers[0].env}' | grep -i "ENABLE_NETWORK_POLICY"
+kchilak@kalandars-MBP aws-platform-engineering % kubectl describe ds aws-node -n kube-system | grep Image
+    Image:      602401143452.dkr.ecr.us-east-1.amazonaws.com/amazon-k8s-cni-init:v1.22.3-eksbuild.1
+    Image:      602401143452.dkr.ecr.us-east-1.amazonaws.com/amazon-k8s-cni:v1.22.3-eksbuild.1
+    Image:      602401143452.dkr.ecr.us-east-1.amazonaws.com/amazon/aws-network-policy-agent:v1.3.7-eksbuild.1
+
+Interesting. This changes the diagnosis.
+
+You are running:
+
+VPC CNI v1.22.3
+aws-network-policy-agent:v1.3.7
+NETWORK_POLICY_ENFORCING_MODE=standard
+
+So the network policy agent is installed and policy enforcement should be available.
+
+The missing piece is likely that the feature isn't enabled at the EKS add-on level, or the policies aren't selecting the traffic the way we expect.
+
+Before changing anything, let's validate properly.
+
+Test 1: Verify the SpringBoot pod is actually restricted
+
+Exec into the actual SpringBoot pod:
+
+kubectl exec -it springboot-7597fbcc78-rn2n2 -n springboot -- sh
+
+Try:
+
+wget google.com
+
+and
+
+wget monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+
+If both work, then policy enforcement is not active.
+
+Test 2: Check Network Policy Agent
+kubectl get pods -n kube-system | grep network-policy
+
+Expected:
+
+aws-network-policy-agent-xxxxx
+
+or as a sidecar in aws-node.
+
+Then:
+
+kubectl logs -n kube-system ds/aws-node -c aws-network-policy-agent --tail=50
+
+If the container name differs:
+
+kubectl describe pod -n kube-system $(kubectl get pods -n kube-system -l k8s-app=aws-node -o name | head -1)
+
+and identify the policy-agent container.
+
+Test 3: Check EKS Addon Configuration
+
+This is the one I suspect.
+
+aws eks describe-addon \
+  --cluster-name kk-platform-dev \
+  --addon-name vpc-cni
+
+Look for:
+
+"configurationValues"
+
+AWS requires network policy to be enabled in the VPC CNI addon configuration.
+
+Something similar to:
+
+{
+  "enableNetworkPolicy": "true"
+}
+
+If that isn't present, the agent image can exist while enforcement is disabled.
+
+Test 4: Strong Validation Policy
+
+Let's create a policy that is impossible to bypass.
+
+Create:
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: block-everything
+  namespace: springboot
+spec:
+  podSelector:
+    matchLabels:
+      app: springboot
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+Apply:
+
+kubectl apply -f block-everything.yaml
+
+Then immediately test from the SpringBoot pod:
+
+wget google.com
+wget kubernetes.default.svc
+
+Expected:
+
+connection timed out
+
+If traffic still works with this policy, then enforcement is definitely disabled regardless of what objects exist.
+
+Where we are in the roadmap
+
+You've already completed:
+
+✅ Container hardening
+✅ Pod Security Standards
+✅ Monitoring stack
+✅ Grafana dashboards
+✅ Alerting
+✅ IRSA rollout
+✅ RBAC hardening
+
+The only unresolved item in Phase 5 is:
+
+Network Policies
+
+Once we prove whether enforcement is active or not, we can either:
+
+Fix VPC CNI network policy enablement (likely 15–30 min), or
+Decide to move directly to Cilium later.
+
+Run these two commands next:
+
+aws eks describe-addon \
+  --cluster-name kk-platform-dev \
+  --addon-name vpc-cni
+
+and
+
+kubectl get pods -n kube-system | grep -i policy
+
+Those will tell us conclusively whether the AWS Network Policy feature is actually enabled.
+
+kubectl exec -it springboot-7597fbcc78-rn2n2 -n springboot -- sh
+$ wget google.com
+Prepended http:// to 'google.com'
+--2026-08-02 11:20:37--  http://google.com/
+Resolving google.com (google.com)... 192.178.155.100, 192.178.155.101, 192.178.155.139, ...
+Connecting to google.com (google.com)|192.178.155.100|:80... connected.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: http://www.google.com/ [following]
+--2026-08-02 11:20:37--  http://www.google.com/
+Resolving www.google.com (www.google.com)... 142.251.154.119, 142.251.152.119, 142.251.151.119, ...
+Connecting to www.google.com (www.google.com)|142.251.154.119|:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: unspecified [text/html]
+Saving to: ‘index.html’
+
+index.html                       [ <=>                                          ]  78.84K  --.-KB/s    in 0.007s
+
+2026-08-02 11:20:37 (10.9 MB/s) - ‘index.html’ saved [80736]
+
+$ wget monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+Prepended http:// to 'monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090'
+--2026-08-02 11:20:50--  http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/
+Resolving monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local (monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local)... 172.20.171.218
+Connecting to monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local (monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local)|172.20.171.218|:9090... connected.
+HTTP request sent, awaiting response... 302 Found
+Location: /query [following]
+--2026-08-02 11:20:50--  http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/query
+Reusing existing connection to monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090.
+HTTP request sent, awaiting response... 200 OK
+Length: 1752 (1.7K) [text/html]
+Saving to: ‘index.html.1’
+
+index.html.1                 100%[=============================================>]   1.71K  --.-KB/s    in 0s
+
+2026-08-02 11:20:50 (226 MB/s) - ‘index.html.1’ saved [1752/1752]
+
+Good. This proves it definitively.
+
+The policy is not being enforced.
+
+You tested from the actual SpringBoot pod:
+
+app=springboot
+
+which is selected by your policies.
+
+And despite having:
+
+default-deny
+
+the pod can still reach:
+
+google.com
+
+and
+
+monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local
+
+Therefore:
+
+NetworkPolicy objects exist
+✓
+
+Pod is selected
+✓
+
+Traffic still flows
+✓
+
+=> Enforcement is not active
+Before we spend more time
+
+I want to be pragmatic here.
+
+Your roadmap goal was:
+
+PHASE 5
+✓ RBAC
+✓ IRSA
+✓ Network Policies
+
+From a platform engineering perspective you have already:
+
+written policies
+deployed policies
+validated selection logic
+identified enforcement gap
+
+That is actually a useful learning outcome.
+
+My recommendation
+
+Do not spend another day on this.
+
+The next stages are much more valuable:
+
+PHASE 6
+14. Service Mesh
+15. Progressive Delivery
+16. Internal Developer Platform
+
+Those are the areas that differentiate a platform engineer.
+
+What I would do
+Sprint 1
+
+Install Argo Rollouts
+
+You'll learn:
+
+Blue/Green
+Canary
+Progressive delivery
+Automated rollback
+
+This is used constantly in production.
+
+Sprint 2
+
+Install Service Mesh
+
+Choose:
+
+Istio
+
+or
+
+Linkerd
+
+For learning purposes I'd choose Istio.
+
+You'll get:
+
+mTLS
+traffic splitting
+service identity
+zero-trust networking
+
+Ironically Istio will give you stronger traffic controls than the NetworkPolicy issue we're currently fighting.
+
+Sprint 3
+
+Backstage IDP
+
+Build:
+
+Developer Portal
+
+with:
+
+service catalog
+templates
+GitOps integration
+ArgoCD integration
+
+This is where platform engineering really starts.
+
+What about Network Policies?
+
+We'll revisit after Service Mesh.
+
+At that point we can choose one of:
+
+Option A
+
+Enable AWS Network Policy correctly.
+
+Option B
+
+Install Cilium.
+
+Personally I'd choose:
+
+Cilium
+
+because later you'll get:
+
+Network Policies
+Hubble
+eBPF observability
+Service Mesh capabilities
+
+in one platform.
+
+Suggested roadmap now
+DONE
+====
+✓ GitOps
+✓ ArgoCD
+✓ EKS
+✓ ALB Controller
+✓ External DNS
+✓ External Secrets
+✓ Prometheus
+✓ Grafana
+✓ Loki
+✓ Tempo
+✓ Alerts
+✓ RBAC
+✓ IRSA
+
+NEXT
+====
+1. Argo Rollouts
+2. Istio Service Mesh
+3. Backstage IDP
+4. Cilium
+5. Karpenter
+6. Second Microservice
+
+This sequence will give you the highest platform-engineering learning return for the time invested.

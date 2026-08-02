@@ -1,0 +1,9 @@
+dashboard:
+  enabled: true
+
+controller:
+  metrics:
+    enabled: true
+
+serviceAccount:
+  create: true
