@@ -18739,3 +18739,227 @@ NEXT
 6. Second Microservice
 
 This sequence will give you the highest platform-engineering learning return for the time invested.
+
+lets proceed further
+
+Excellent. Now we're entering the part that most engineers never get to build end-to-end.
+
+Current state of your platform:
+
+Platform Foundation
+===================
+✓ Terraform
+✓ EKS
+✓ GitOps (ArgoCD)
+✓ ALB Controller
+✓ External DNS
+✓ External Secrets
+✓ Prometheus
+✓ Grafana
+✓ Loki
+✓ Tempo
+✓ Alerting
+✓ Pod Security
+✓ RBAC
+✓ IRSA
+
+In Progress
+===========
+△ Network Policy Enforcement
+
+Not Started
+===========
+✗ Progressive Delivery
+✗ Service Mesh
+✗ IDP
+
+At this point I would not jump to Istio first.
+
+The next logical step is:
+
+Sprint 9 — Progressive Delivery (Argo Rollouts)
+
+Because:
+
+Current
+-------
+Deployment
+   ↓
+Rolling Update
+
+Target
+------
+Deployment
+   ↓
+Canary
+   ↓
+Automatic Promotion
+   ↓
+Automatic Rollback
+
+This is one of the most valuable production skills.
+
+What We Will Build
+
+Instead of:
+
+v1 ---> v2
+
+We will do:
+
+100% v1
+
+Deploy v2
+
+90% -> v1
+10% -> v2
+
+Observe metrics
+
+50% -> v1
+50% -> v2
+
+Observe metrics
+
+100% -> v2
+
+using:
+
+Argo Rollouts
++
+Prometheus
++
+Grafana
+Final GitOps Structure
+
+Create:
+
+gitops
+├── applications
+│   └── platform
+│       └── argo-rollouts.yaml
+
+├── manifests
+│   └── argo-rollouts
+│       ├── namespace.yaml
+│       └── kustomization.yaml
+
+└── values
+    └── argo-rollouts
+        └── dev.yaml
+Step 1
+File
+gitops/applications/platform/argo-rollouts.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+
+spec:
+
+  project: default
+
+  destination:
+    namespace: argo-rollouts
+    server: https://kubernetes.default.svc
+
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.40.4
+
+    helm:
+      valueFiles:
+        - $values/gitops/values/argo-rollouts/dev.yaml
+
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-rollouts
+      targetRevision: 2.40.4
+
+      helm:
+        valueFiles:
+          - $values/gitops/values/argo-rollouts/dev.yaml
+
+    - repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+      targetRevision: main
+      ref: values
+
+  syncPolicy:
+
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
+Step 2
+File
+gitops/values/argo-rollouts/dev.yaml
+dashboard:
+  enabled: true
+
+controller:
+  metrics:
+    enabled: true
+
+serviceAccount:
+  create: true
+Step 3
+
+Commit
+
+git add .
+git commit -m "add argo rollouts"
+git push
+Step 4 Verify
+kubectl get pods -n argo-rollouts
+
+Expected:
+
+argo-rollouts-xxxxx
+Step 5 Verify CRDs
+kubectl get crd | grep rollout
+
+Expected:
+
+rollouts.argoproj.io
+analysisruns.argoproj.io
+analysistemplates.argoproj.io
+Step 6 Dashboard
+
+Port-forward:
+
+kubectl port-forward svc/argo-rollouts-dashboard \
+  -n argo-rollouts \
+  3100:3100
+
+Open:
+
+http://localhost:3100
+After Verification
+
+We'll convert your existing:
+
+springboot Deployment
+
+into:
+
+Rollout
+
+with:
+
+Canary
+10%
+50%
+100%
+
+and integrate:
+
+Prometheus metrics
+
+for automatic rollback.
+
+That will complete Progressive Delivery before we move into Istio Service Mesh.
