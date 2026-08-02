@@ -17,6 +17,10 @@ spec:
         app: springboot
 
     spec:
+      serviceAccountName: springboot
+
+      automountServiceAccountToken: false
+
       securityContext:
         fsGroup: 10001
       containers:

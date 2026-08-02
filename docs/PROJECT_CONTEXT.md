@@ -16377,3 +16377,1023 @@ Watch Karpenter launch a new EC2 automatically.
 Watch Karpenter terminate it when load disappears.
 
 That's the point where we know autoscaling is actually working.
+
+
+kubectl get cm -n monitoring
+NAME                                                           DATA   AGE
+kube-root-ca.crt                                               1      2d17h
+monitoring-grafana                                             2      2d17h
+monitoring-grafana-config-dashboards                           1      2d17h
+monitoring-kube-prometheus-alertmanager-overview               1      2d17h
+monitoring-kube-prometheus-apiserver                           1      2d17h
+monitoring-kube-prometheus-cluster-total                       1      2d17h
+monitoring-kube-prometheus-controller-manager                  1      2d17h
+monitoring-kube-prometheus-etcd                                1      2d17h
+monitoring-kube-prometheus-grafana-datasource                  1      2d17h
+monitoring-kube-prometheus-grafana-overview                    1      2d17h
+monitoring-kube-prometheus-k8s-coredns                         1      2d17h
+monitoring-kube-prometheus-k8s-resources-cluster               1      2d17h
+monitoring-kube-prometheus-k8s-resources-multicluster          1      2d17h
+monitoring-kube-prometheus-k8s-resources-namespace             1      2d17h
+monitoring-kube-prometheus-k8s-resources-node                  1      2d17h
+monitoring-kube-prometheus-k8s-resources-pod                   1      2d17h
+monitoring-kube-prometheus-k8s-resources-workload              1      2d17h
+monitoring-kube-prometheus-k8s-resources-workloads-namespace   1      2d17h
+monitoring-kube-prometheus-kubelet                             1      2d17h
+monitoring-kube-prometheus-namespace-by-pod                    1      2d17h
+monitoring-kube-prometheus-namespace-by-workload               1      2d17h
+monitoring-kube-prometheus-node-cluster-rsrc-use               1      2d17h
+monitoring-kube-prometheus-node-rsrc-use                       1      2d17h
+monitoring-kube-prometheus-nodes                               1      2d17h
+monitoring-kube-prometheus-nodes-aix                           1      2d17h
+monitoring-kube-prometheus-nodes-darwin                        1      2d17h
+monitoring-kube-prometheus-persistentvolumesusage              1      2d17h
+monitoring-kube-prometheus-pod-total                           1      2d17h
+monitoring-kube-prometheus-prometheus                          1      2d17h
+monitoring-kube-prometheus-proxy                               1      2d17h
+monitoring-kube-prometheus-scheduler                           1      2d17h
+monitoring-kube-prometheus-workload-total                      1      2d17h
+prometheus-monitoring-kube-prometheus-prometheus-rulefiles-0   35     47h
+I only see cluster dashboards, not springboot
+I see dashboard now, lets proceed with PHASE 4 — Platform Expansion
+9. Second Microservice
+10. Distributed Tracing Across Services
+part karpenter for later
+
+Perfect. The screenshot tells us everything we need:
+
+✅ Grafana dashboard provisioning works
+✅ Prometheus is scraping Spring Boot metrics
+✅ ServiceMonitor works
+✅ Micrometer works
+✅ Dashboard ConfigMaps are loading through GitOps
+
+We can consider Phase 2 complete.
+
+Current Platform State
+
+You now have:
+
+Internet
+   │
+ALB
+   │
+SpringBoot
+   │
+Micrometer
+   │
+Prometheus
+   │
+Grafana
+
+and
+
+SpringBoot
+   │
+Logs
+   ▼
+Alloy
+   ▼
+Loki
+   ▼
+Grafana
+
+and
+
+SpringBoot
+   │
+OTEL
+   ▼
+Tempo
+   ▼
+Grafana Traces
+
+The missing piece is:
+
+Service A
+   │
+   ▼
+Service B
+
+because tracing becomes interesting only when requests cross service boundaries.
+
+PHASE 4 — Platform Expansion
+
+We will intentionally skip Karpenter for now.
+
+New roadmap:
+
+Sprint 4
+---------
+Second Microservice
+
+Sprint 5
+---------
+Distributed Tracing
+
+Sprint 6
+---------
+Trace ↔ Metrics ↔ Logs Correlation
+What Second Service Should We Build?
+
+Don't build another CRUD app.
+
+Build something that demonstrates platform concepts.
+
+Current:
+
+platform-app
+
+Add:
+
+inventory-service
+
+Architecture:
+
+User
+ │
+ ▼
+platform-app
+ │
+ ▼
+inventory-service
+Flow
+
+Current endpoint:
+
+GET /hello
+
+becomes:
+
+GET /order
+
+Platform Service:
+
+@RestController
+public class OrderController {
+
+    @GetMapping("/order")
+    public String order() {
+
+        return inventoryClient.checkInventory();
+    }
+}
+
+calls
+
+inventory-service
+
+through Kubernetes DNS.
+
+Kubernetes Service Discovery
+
+No ingress needed.
+
+Platform App calls:
+
+http://inventory-service.demo.svc.cluster.local:8080/inventory
+
+or
+
+http://inventory-service:8080/inventory
+
+inside namespace.
+
+New Workload
+
+Create:
+
+gitops/manifests/inventory
+
+Structure:
+
+inventory
+├── deployment.yaml
+├── service.yaml
+├── servicemonitor.yaml
+└── kustomization.yaml
+Deployment
+
+Almost identical to SpringBoot.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: demo
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: inventory-service
+
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+
+    spec:
+      containers:
+
+      - name: inventory
+
+        image: <your-image>
+
+        ports:
+        - containerPort: 8080
+Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  namespace: demo
+
+spec:
+  selector:
+    app: inventory-service
+
+  ports:
+  - port: 8080
+    targetPort: 8080
+ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+
+metadata:
+  name: inventory-service
+  namespace: monitoring
+
+spec:
+
+  namespaceSelector:
+    matchNames:
+      - demo
+
+  selector:
+    matchLabels:
+      app: inventory-service
+
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+
+Now Prometheus scrapes both services.
+
+Sprint 5 — Distributed Tracing
+
+This is where Tempo becomes valuable.
+
+Current:
+
+Browser
+   │
+   ▼
+Platform App
+
+Future:
+
+Browser
+   │
+   ▼
+Platform App
+   │
+   ▼
+Inventory Service
+
+A single request produces:
+
+TraceID
+ ├── Span 1
+ │   Platform App
+ │
+ └── Span 2
+     Inventory Service
+
+visible in Tempo.
+
+Required Code Changes
+
+Both applications need:
+
+micrometer-tracing-bridge-otel
+
+opentelemetry-exporter-otlp
+
+in pom.xml.
+
+application.yml
+
+management:
+
+  tracing:
+    sampling:
+      probability: 1.0
+
+  otlp:
+    tracing:
+      endpoint: http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces
+Spring Boot → Spring Boot Trace Propagation
+
+Use RestTemplate or WebClient.
+
+Example:
+
+@Bean
+RestTemplate restTemplate(RestTemplateBuilder builder) {
+    return builder.build();
+}
+
+Micrometer automatically propagates:
+
+traceparent
+
+header.
+
+No custom code required.
+
+Result
+
+Tempo trace becomes:
+
+GET /order
+
+Platform App
+  40ms
+
+Inventory Service
+  15ms
+
+instead of:
+
+GET /order
+
+Platform App only
+What I would do next
+Create inventory-service
+Deploy through ArgoCD/GitOps
+Add ServiceMonitor
+Verify Prometheus metrics
+Add OTEL tracing dependencies
+Connect platform-app → inventory-service
+Verify distributed traces in Tempo
+Add trace-to-log correlation in Grafana
+
+That gives you a genuinely production-relevant platform pattern: multi-service observability with metrics, logs, and distributed tracing, which is a much better use of time right now than continuing to fight Karpenter.
+
+since we already saw deploying one app, lets move to PHASE 5 — Zero Trust Networking
+11. Network Policies
+12. RBAC Hardening
+13. IRSA Adoption Everywhere
+
+PHASE 6 — Platform Engineering
+14. Service Mesh
+15. Progressive Delivery (Argo Rollouts)
+16. Developer Self-Service / IDP and then we can work on karpenter and second microservice
+
+I would not jump directly to Service Mesh, Argo Rollouts, and IDP before finishing Zero Trust Networking. In a real platform engineering journey, security foundations come before platform abstractions.
+
+For your current platform, I'd reorder the roadmap slightly:
+
+Next Roadmap
+PHASE 5A — Zero Trust Foundations
+---------------------------------
+11. Network Policies
+12. RBAC Hardening
+13. IRSA Adoption Everywhere
+
+PHASE 5B — Runtime Security
+---------------------------
+14. Kyverno Policies
+15. Image Signature Verification
+16. Secrets Governance
+
+PHASE 6 — Platform Engineering
+------------------------------
+17. Service Mesh
+18. Progressive Delivery
+19. Internal Developer Platform
+
+PHASE 7
+--------
+20. Second Microservice
+21. Distributed Tracing
+22. Karpenter
+
+Reason:
+
+Network Policy
+      ↓
+RBAC
+      ↓
+IRSA
+      ↓
+Service Mesh
+      ↓
+Progressive Delivery
+      ↓
+IDP
+
+A service mesh without network segmentation and proper identity is just extra complexity.
+
+What I would start tomorrow
+Step 1 — Network Policies
+
+Right now your cluster is probably:
+
+Pod A  ─────────► Pod B
+Pod A  ─────────► Pod C
+Pod A  ─────────► Prometheus
+Pod A  ─────────► Loki
+Pod A  ─────────► KubeDNS
+
+Everything can talk to everything.
+
+That's not Zero Trust.
+
+Goal
+
+SpringBoot should only reach:
+
+DNS
+Prometheus scraping
+Ingress traffic
+
+Nothing else.
+
+Policy 1 — Default Deny
+
+Create:
+
+gitops/manifests/security/default-deny.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: default-deny
+  namespace: springboot
+
+spec:
+  podSelector: {}
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+Immediately:
+
+everything blocked
+Policy 2 — Allow Ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-ingress
+  namespace: springboot
+
+spec:
+
+  podSelector:
+    matchLabels:
+      app: springboot
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+
+  - from:
+      - namespaceSelector: {}
+
+    ports:
+      - protocol: TCP
+        port: 8080
+Policy 3 — DNS
+
+Without this everything breaks.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-dns
+  namespace: springboot
+
+spec:
+
+  podSelector:
+    matchLabels:
+      app: springboot
+
+  policyTypes:
+    - Egress
+
+  egress:
+
+  - to:
+
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+
+    ports:
+      - protocol: UDP
+        port: 53
+
+      - protocol: TCP
+        port: 53
+Policy 4 — Allow Metrics
+
+Prometheus scraping.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-prometheus
+  namespace: springboot
+
+spec:
+
+  podSelector:
+    matchLabels:
+      app: springboot
+
+  ingress:
+
+  - from:
+
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: monitoring
+
+    ports:
+      - protocol: TCP
+        port: 8080
+Then RBAC Hardening
+
+Today most likely:
+
+default service account
+
+or
+
+cluster-admin somewhere
+
+which is common in labs.
+
+Goal
+
+SpringBoot gets:
+
+No API permissions
+
+Literally:
+
+automountServiceAccountToken: false
+
+inside deployment.
+
+Create dedicated service account:
+
+apiVersion: v1
+kind: ServiceAccount
+
+metadata:
+  name: springboot
+  namespace: springboot
+
+Deployment:
+
+spec:
+  serviceAccountName: springboot
+  automountServiceAccountToken: false
+
+Huge security improvement.
+
+Then IRSA Adoption Everywhere
+
+Currently you probably have IRSA only on:
+
+ALB Controller
+External DNS
+External Secrets
+Karpenter
+
+I would verify every AWS-integrated workload uses IRSA.
+
+Current target list:
+
+ALB Controller
+ExternalDNS
+External Secrets
+Karpenter
+Alloy
+OTEL Collector
+Future applications
+After That: Service Mesh
+
+Only after Network Policies and IRSA.
+
+Then we introduce:
+
+Istio
+or
+Linkerd
+
+For learning purposes:
+
+Istio
+
+because it teaches:
+
+mTLS
+Authorization Policies
+Traffic Splitting
+Canary Releases
+Observability
+
+all in one platform.
+
+Then Progressive Delivery
+
+Install:
+
+Argo Rollouts
+
+You already have:
+
+GitOps
+ArgoCD
+ALB
+Prometheus
+Grafana
+
+which is exactly what Argo Rollouts needs.
+
+We'll replace:
+
+kind: Deployment
+
+with
+
+kind: Rollout
+
+and perform:
+
+10%
+25%
+50%
+100%
+
+traffic promotion.
+
+Then IDP
+
+Only after all of the above.
+
+At that point your platform has:
+
+Terraform
+GitHub Actions
+EKS
+ArgoCD
+External Secrets
+ALB
+ExternalDNS
+Prometheus
+Grafana
+Loki
+Tempo
+Network Policies
+IRSA
+Service Mesh
+Rollouts
+
+Now an Internal Developer Platform actually makes sense because there is something substantial to abstract.
+
+So my recommendation is:
+
+Next sprint = Network Policies → RBAC Hardening → IRSA audit.
+
+That is the highest security return for the least engineering effort, and it sets up everything that follows.
+
+lets proceed with Next sprint = Network Policies → RBAC Hardening → IRSA audit, but now I want you to give all the complete files, path in order how they needs to be implemented
+
+Good. At this stage I would implement this exactly as a real platform team would:
+
+Sprint 4.1
+├── Network Policies
+├── Service Accounts
+├── RBAC Hardening
+└── IRSA Audit
+
+Sprint 4.2
+├── Kyverno
+├── Security Policies
+└── Admission Controls
+
+Sprint 4.3
+├── Istio
+├── mTLS
+└── Authorization Policies
+
+Let's do Sprint 4.1 completely.
+
+Step 1 Create Security Manifests Directory
+
+Create:
+
+gitops/manifests/security
+├── allow-dns.yaml
+├── allow-prometheus.yaml
+├── default-deny.yaml
+├── ingress-allow.yaml
+├── springboot-serviceaccount.yaml
+├── springboot-role.yaml
+├── springboot-rolebinding.yaml
+└── kustomization.yaml
+File 1
+gitops/manifests/security/default-deny.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: default-deny
+  namespace: springboot
+
+spec:
+  podSelector: {}
+
+  policyTypes:
+    - Ingress
+    - Egress
+File 2
+gitops/manifests/security/allow-dns.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-dns
+  namespace: springboot
+
+spec:
+
+  podSelector:
+    matchLabels:
+      app: springboot
+
+  policyTypes:
+    - Egress
+
+  egress:
+
+    - to:
+
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+
+      ports:
+
+        - protocol: UDP
+          port: 53
+
+        - protocol: TCP
+          port: 53
+File 3
+gitops/manifests/security/allow-prometheus.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-prometheus
+  namespace: springboot
+
+spec:
+
+  podSelector:
+    matchLabels:
+      app: springboot
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+
+    - from:
+
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+
+      ports:
+
+        - protocol: TCP
+          port: 8080
+File 4
+gitops/manifests/security/ingress-allow.yaml
+
+This allows ALB traffic.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-alb-ingress
+  namespace: springboot
+
+spec:
+
+  podSelector:
+    matchLabels:
+      app: springboot
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+
+    - from:
+
+        - namespaceSelector: {}
+
+      ports:
+
+        - protocol: TCP
+          port: 8080
+RBAC Hardening
+
+Most applications need zero Kubernetes API access.
+
+That means:
+
+automountServiceAccountToken: false
+
+and a dedicated ServiceAccount.
+
+File 5
+gitops/manifests/security/springboot-serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+
+metadata:
+  name: springboot
+  namespace: springboot
+File 6
+gitops/manifests/security/springboot-role.yaml
+
+For now:
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+
+metadata:
+  name: springboot
+  namespace: springboot
+
+rules: []
+
+No permissions.
+
+Exactly what we want.
+
+File 7
+gitops/manifests/security/springboot-rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+
+metadata:
+  name: springboot
+  namespace: springboot
+
+subjects:
+
+  - kind: ServiceAccount
+    name: springboot
+    namespace: springboot
+
+roleRef:
+  kind: Role
+  name: springboot
+  apiGroup: rbac.authorization.k8s.io
+File 8
+gitops/manifests/security/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - default-deny.yaml
+  - allow-dns.yaml
+  - allow-prometheus.yaml
+  - ingress-allow.yaml
+  - springboot-serviceaccount.yaml
+  - springboot-role.yaml
+  - springboot-rolebinding.yaml
+Modify SpringBoot Deployment
+
+Open:
+
+gitops/manifests/springboot/deployment.yaml
+
+Locate:
+
+spec:
+  template:
+    spec:
+
+Replace with:
+
+spec:
+  template:
+    spec:
+
+      serviceAccountName: springboot
+
+      automountServiceAccountToken: false
+
+Example:
+
+spec:
+  replicas: 2
+
+  template:
+
+    spec:
+
+      serviceAccountName: springboot
+
+      automountServiceAccountToken: false
+
+      containers:
+        - name: springboot
+Create Argo Application
+
+Create:
+
+gitops/applications/platform/security.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: security
+  namespace: argocd
+
+spec:
+
+  project: default
+
+  source:
+    repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+    targetRevision: main
+    path: gitops/manifests/security
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: springboot
+
+  syncPolicy:
+
+    automated:
+      prune: true
+      selfHeal: true
+Verify Deployment
+
+After Argo sync:
+
+kubectl get networkpolicy -n springboot
+
+Expected:
+
+default-deny
+allow-dns
+allow-prometheus
+allow-alb-ingress
+
+Verify ServiceAccount:
+
+kubectl get sa -n springboot
+
+Expected:
+
+springboot
+
+Verify token removed:
+
+kubectl describe pod -n springboot
+
+You should NOT see:
+
+/var/run/secrets/kubernetes.io/serviceaccount
+
+mounted into the application container.
+
+IRSA Audit (same sprint)
+
+After the above is deployed run:
+
+kubectl get sa -A -o yaml | grep eks.amazonaws.com/role-arn -B2 -A2
+
+We will inventory every IRSA-enabled workload and identify anything still using node credentials.
+
+That audit is the final task of this sprint before moving to Kyverno and admission
