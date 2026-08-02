@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: network-policies
+  namespace: argocd
+
+spec:
+
+  project: default
+
+  source:
+    repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+    targetRevision: main
+    path: gitops/manifests/network-policies
+
+  destination:
+    server: https://kubernetes.default.svc
+
+  syncPolicy:
+
+    automated:
+      prune: true
+      selfHeal: true

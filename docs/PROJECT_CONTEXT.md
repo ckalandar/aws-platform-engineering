@@ -17899,3 +17899,338 @@ Argo Rollouts
 Backstage IDP
 
 which becomes the Platform Engineering phase.
+
+I have validated all above verifications and look good, lets proceed further give me the steps/files/location like you had given earlier
+kubectl get clusterrole | grep platform
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get application security -n argocd
+NAME       SYNC STATUS   HEALTH STATUS
+security   Synced        Healthy
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get clusterrole | grep platform
+platform-readonly                                                      2026-08-02T10:26:23Z
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get clusterrolebinding | grep platform
+platform-readonly                                               ClusterRole/platform-readonly                                               49s
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get role -n springboot
+NAME              CREATED AT
+namespace-admin   2026-08-02T10:26:23Z
+kchilak@kalandars-MBP aws-platform-engineering % kubectl get rolebinding -n springboot
+NAME              ROLE                   AGE
+namespace-admin   Role/namespace-admin   66s
+
+Perfect.
+
+At this point you've completed:
+
+✅ GitOps (ArgoCD)
+✅ EKS Foundation
+✅ External Secrets
+✅ External DNS
+✅ AWS Load Balancer Controller
+✅ Observability Stack
+✅ Grafana Dashboards
+✅ Loki + Tempo
+✅ IRSA Adoption
+✅ RBAC Hardening
+
+Next Sprint
+Zero Trust Networking
+
+This is where we stop trusting pod-to-pod communication.
+
+Current Kubernetes behavior:
+
+Any Pod
+    ↓
+Can talk to
+    ↓
+Any Pod
+
+Production behavior:
+
+SpringBoot Pod
+    ↓
+Can talk only to:
+      DNS
+      Prometheus
+      Loki
+      Tempo
+
+Everything else denied
+Folder Structure
+
+Create:
+
+gitops/manifests/network-policies
+├── default-deny.yaml
+├── allow-dns.yaml
+├── allow-monitoring.yaml
+├── allow-ingress.yaml
+├── kustomization.yaml
+Step 1
+default-deny.yaml
+
+Path:
+
+gitops/manifests/network-policies/default-deny.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: default-deny
+  namespace: springboot
+
+spec:
+
+  podSelector: {}
+
+  policyTypes:
+    - Ingress
+    - Egress
+Step 2
+allow-dns.yaml
+
+Path:
+
+gitops/manifests/network-policies/allow-dns.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-dns
+  namespace: springboot
+
+spec:
+
+  podSelector: {}
+
+  policyTypes:
+    - Egress
+
+  egress:
+
+    - to:
+
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+
+      ports:
+
+        - protocol: UDP
+          port: 53
+
+        - protocol: TCP
+          port: 53
+Step 3
+allow-monitoring.yaml
+
+Path:
+
+gitops/manifests/network-policies/allow-monitoring.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-monitoring
+  namespace: springboot
+
+spec:
+
+  podSelector: {}
+
+  policyTypes:
+    - Egress
+
+  egress:
+
+    - to:
+
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+
+    - to:
+
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: loki
+
+    - to:
+
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tempo
+Step 4
+allow-ingress.yaml
+
+Allow traffic from ALB Controller-managed ingress.
+
+Path:
+
+gitops/manifests/network-policies/allow-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-ingress
+  namespace: springboot
+
+spec:
+
+  podSelector:
+    matchLabels:
+      app: springboot
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+
+    - from:
+
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+
+    - from:
+
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: springboot
+
+  egress:
+
+    - {}
+Step 5
+kustomization.yaml
+
+Path:
+
+gitops/manifests/network-policies/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - default-deny.yaml
+  - allow-dns.yaml
+  - allow-monitoring.yaml
+  - allow-ingress.yaml
+Step 6
+
+Create ArgoCD Application
+
+Path:
+
+gitops/applications/platform/network-policies.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: network-policies
+  namespace: argocd
+
+spec:
+
+  project: default
+
+  source:
+    repoURL: https://github.com/ckalandar/aws-platform-engineering.git
+    targetRevision: main
+    path: gitops/manifests/network-policies
+
+  destination:
+    server: https://kubernetes.default.svc
+
+  syncPolicy:
+
+    automated:
+      prune: true
+      selfHeal: true
+
+Commit:
+
+git add .
+git commit -m "add network policies"
+git push
+Validation
+
+Wait until:
+
+kubectl get application network-policies -n argocd
+
+shows:
+
+Synced
+Healthy
+
+Then:
+
+kubectl get networkpolicy -n springboot
+
+Expected:
+
+allow-dns
+allow-ingress
+allow-monitoring
+default-deny
+Real Validation
+
+Launch a temporary pod:
+
+kubectl run test \
+  -n springboot \
+  --image=busybox:1.36 \
+  --restart=Never \
+  -it -- sh
+
+Inside pod:
+
+DNS should work:
+
+nslookup kubernetes.default
+
+Expected:
+
+Success
+
+Try external internet:
+
+wget google.com
+
+Expected:
+
+Fail
+
+Try Prometheus:
+
+wget monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+
+Expected:
+
+Success
+What This Gives You
+
+After this sprint:
+
+Default Deny
+↓
+Explicit Allow
+↓
+Namespace Isolation
+↓
+Workload Isolation
+
+This is the first real Zero Trust control in the cluster.
+
+After Network Policies
+
+Next sprint is where Platform Engineering starts becoming visible:
+
+Sprint 6
+├── Kyverno
+├── Require non-root
+├── Require resource limits
+├── Block latest tags
+├── Require labels
+└── ReadOnlyRootFilesystem
+
+Kyverno should come before Istio because policy enforcement is a more fundamental platform control than service mesh.
