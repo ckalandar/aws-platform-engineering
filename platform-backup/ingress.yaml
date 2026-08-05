@@ -1,0 +1,115 @@
+apiVersion: v1
+items:
+- apiVersion: networking.k8s.io/v1
+  kind: Ingress
+  metadata:
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      argocd.argoproj.io/tracking-id: nginx:networking.k8s.io/Ingress:demo/nginx
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{"alb.ingress.kubernetes.io/scheme":"internet-facing","alb.ingress.kubernetes.io/target-type":"ip","argocd.argoproj.io/tracking-id":"nginx:networking.k8s.io/Ingress:demo/nginx"},"name":"nginx","namespace":"demo"},"spec":{"ingressClassName":"alb","rules":[{"http":{"paths":[{"backend":{"service":{"name":"nginx","port":{"number":80}}},"path":"/","pathType":"Prefix"}]}}]}}
+    creationTimestamp: "2026-07-29T07:27:33Z"
+    finalizers:
+    - ingress.k8s.aws/resources
+    generation: 1
+    name: nginx
+    namespace: demo
+    resourceVersion: "21126"
+    uid: a01af505-1ccd-4147-aa3b-8dc4ba217ac7
+  spec:
+    ingressClassName: alb
+    rules:
+    - http:
+        paths:
+        - backend:
+            service:
+              name: nginx
+              port:
+                number: 80
+          path: /
+          pathType: Prefix
+  status:
+    loadBalancer:
+      ingress:
+      - hostname: k8s-demo-nginx-2e5ada922c-716034082.us-east-1.elb.amazonaws.com
+- apiVersion: networking.k8s.io/v1
+  kind: Ingress
+  metadata:
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      argocd.argoproj.io/tracking-id: monitoring:networking.k8s.io/Ingress:monitoring/monitoring-grafana
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{"alb.ingress.kubernetes.io/scheme":"internet-facing","alb.ingress.kubernetes.io/target-type":"ip","argocd.argoproj.io/tracking-id":"monitoring:networking.k8s.io/Ingress:monitoring/monitoring-grafana"},"labels":{"app.kubernetes.io/instance":"monitoring","app.kubernetes.io/name":"grafana","app.kubernetes.io/version":"12.1.1","helm.sh/chart":"grafana-10.0.0"},"name":"monitoring-grafana","namespace":"monitoring"},"spec":{"ingressClassName":"alb","rules":[{"host":"grafana.dev.learnsystems.co","http":{"paths":[{"backend":{"service":{"name":"monitoring-grafana","port":{"number":80}}},"path":"/","pathType":"Prefix"}]}}]}}
+    creationTimestamp: "2026-07-30T13:05:07Z"
+    finalizers:
+    - ingress.k8s.aws/resources
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: monitoring
+      app.kubernetes.io/name: grafana
+      app.kubernetes.io/version: 12.1.1
+      helm.sh/chart: grafana-10.0.0
+    name: monitoring-grafana
+    namespace: monitoring
+    resourceVersion: "351514"
+    uid: 84485629-59c1-42a0-ae75-ff0b13c377ba
+  spec:
+    ingressClassName: alb
+    rules:
+    - host: grafana.dev.learnsystems.co
+      http:
+        paths:
+        - backend:
+            service:
+              name: monitoring-grafana
+              port:
+                number: 80
+          path: /
+          pathType: Prefix
+  status:
+    loadBalancer:
+      ingress:
+      - hostname: k8s-monitori-monitori-17da4d04b1-1367080749.us-east-1.elb.amazonaws.com
+- apiVersion: networking.k8s.io/v1
+  kind: Ingress
+  metadata:
+    annotations:
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/target-type: ip
+      argocd.argoproj.io/tracking-id: springboot:networking.k8s.io/Ingress:springboot/springboot
+      external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{"alb.ingress.kubernetes.io/certificate-arn":"arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9","alb.ingress.kubernetes.io/listen-ports":"[{\"HTTP\":80},{\"HTTPS\":443}]","alb.ingress.kubernetes.io/scheme":"internet-facing","alb.ingress.kubernetes.io/ssl-redirect":"443","alb.ingress.kubernetes.io/target-type":"ip","argocd.argoproj.io/tracking-id":"springboot:networking.k8s.io/Ingress:springboot/springboot","external-dns.alpha.kubernetes.io/hostname":"springboot.dev.learnsystems.co"},"name":"springboot","namespace":"springboot"},"spec":{"ingressClassName":"alb","rules":[{"host":"springboot.dev.learnsystems.co","http":{"paths":[{"backend":{"service":{"name":"springboot-canary","port":{"number":80}}},"path":"/","pathType":"Prefix"}]}}]}}
+    creationTimestamp: "2026-08-02T12:41:20Z"
+    finalizers:
+    - ingress.k8s.aws/resources
+    generation: 1
+    name: springboot
+    namespace: springboot
+    resourceVersion: "1461889"
+    uid: dd95670a-cb49-489c-bc9a-5caee65eb88c
+  spec:
+    ingressClassName: alb
+    rules:
+    - host: springboot.dev.learnsystems.co
+      http:
+        paths:
+        - backend:
+            service:
+              name: springboot-canary
+              port:
+                number: 80
+          path: /
+          pathType: Prefix
+  status:
+    loadBalancer:
+      ingress:
+      - hostname: k8s-springbo-springbo-2f4bc59496-1514861344.us-east-1.elb.amazonaws.com
+kind: List
+metadata:
+  resourceVersion: ""

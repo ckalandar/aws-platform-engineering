@@ -1,1 +1,130 @@
-apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"istiod:apps/Deployment:istio-system/istiod"},"labels":{"app":"istiod","app.kubernetes.io/instance":"istiod","app.kubernetes.io/managed-by":"Helm","app.kubernetes.io/name":"istiod","app.kubernetes.io/part-of":"istio","app.kubernetes.io/version":"1.28.0","helm.sh/chart":"istiod-1.28.0","install.operator.istio.io/owning-resource":"unknown","istio":"pilot","istio.io/rev":"default","operator.istio.io/component":"Pilot","release":"istiod"},"name":"istiod","namespace":"istio-system"},"spec":{"selector":{"matchLabels":{"istio":"pilot"}},"strategy":{"rollingUpdate":{"maxSurge":"100%","maxUnavailable":"25%"}},"template":{"metadata":{"annotations":{"prometheus.io/port":"15014","prometheus.io/scrape":"true","sidecar.istio.io/inject":"false"},"labels":{"app":"istiod","app.kubernetes.io/instance":"istiod","app.kubernetes.io/managed-by":"Helm","app.kubernetes.io/name":"istiod","app.kubernetes.io/part-of":"istio","app.kubernetes.io/version":"1.28.0","helm.sh/chart":"istiod-1.28.0","install.operator.istio.io/owning-resource":"unknown","istio":"pilot","istio.io/dataplane-mode":"none","istio.io/rev":"default","operator.istio.io/component":"Pilot","sidecar.istio.io/inject":"false"}},"spec":{"containers":[{"args":["discovery","--monitoringAddr=:15014","--log_output_level=default:info","--domain","cluster.local","--keepaliveMaxServerConnectionAge","30m"],"env":[{"name":"REVISION","value":"default"},{"name":"PILOT_CERT_PROVIDER","value":"istiod"},{"name":"POD_NAME","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"metadata.name"}}},{"name":"POD_NAMESPACE","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"metadata.namespace"}}},{"name":"SERVICE_ACCOUNT","valueFrom":{"fieldRef":{"apiVersion":"v1","fieldPath":"spec.serviceAccountName"}}},{"name":"KUBECONFIG","value":"/var/run/secrets/remote/config"},{"name":"CA_TRUSTED_NODE_ACCOUNTS","value":"istio-system/ztunnel"},{"name":"EXTERNAL_ISTIOD","value":"false"},{"name":"PILOT_TRACE_SAMPLING","value":"1"},{"name":"PILOT_ENABLE_ANALYSIS","value":"false"},{"name":"CLUSTER_ID","value":"Kubernetes"},{"name":"GOMEMLIMIT","valueFrom":{"resourceFieldRef":{"divisor":"1","resource":"limits.memory"}}},{"name":"GOMAXPROCS","valueFrom":{"resourceFieldRef":{"divisor":"1","resource":"limits.cpu"}}},{"name":"PLATFORM","value":""}],"image":"docker.io/istio/pilot:1.28.0","name":"discovery","ports":[{"containerPort":8080,"name":"http-debug","protocol":"TCP"},{"containerPort":15010,"name":"grpc-xds","protocol":"TCP"},{"containerPort":15012,"name":"tls-xds","protocol":"TCP"},{"containerPort":15017,"name":"https-webhooks","protocol":"TCP"},{"containerPort":15014,"name":"http-monitoring","protocol":"TCP"}],"readinessProbe":{"httpGet":{"path":"/ready","port":8080},"initialDelaySeconds":1,"periodSeconds":3,"timeoutSeconds":5},"resources":{"requests":{"cpu":"500m","memory":"2048Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsNonRoot":true},"volumeMounts":[{"mountPath":"/var/run/secrets/tokens","name":"istio-token","readOnly":true},{"mountPath":"/var/run/secrets/istio-dns","name":"local-certs"},{"mountPath":"/etc/cacerts","name":"cacerts","readOnly":true},{"mountPath":"/var/run/secrets/remote","name":"istio-kubeconfig","readOnly":true},{"mountPath":"/var/run/secrets/istiod/tls","name":"istio-csr-dns-cert","readOnly":true},{"mountPath":"/var/run/secrets/istiod/ca","name":"istio-csr-ca-configmap","readOnly":true}]}],"serviceAccountName":"istiod","tolerations":[{"key":"cni.istio.io/not-ready","operator":"Exists"}],"volumes":[{"emptyDir":{"medium":"Memory"},"name":"local-certs"},{"name":"istio-token","projected":{"sources":[{"serviceAccountToken":{"audience":"istio-ca","expirationSeconds":43200,"path":"istio-token"}}]}},{"name":"cacerts","secret":{"optional":true,"secretName":"cacerts"}},{"name":"istio-kubeconfig","secret":{"optional":true,"secretName":"istio-kubeconfig"}},{"name":"istio-csr-dns-cert","secret":{"optional":true,"secretName":"istiod-tls"}},{"configMap":{"defaultMode":420,"name":"istio-ca-root-cert","optional":true},"name":"istio-csr-ca-configmap"}]}}}}
+Set up InsForge as the backend for this project.
+1. Sign in: npx @insforge/cli login --user-api-key uak__JWECidonhNxQkO3hSqQLaXqPPIfhpyXHO-YBqQdN4U
+2. Run npx @insforge/cli create to create a project linked to this directory (or npx @insforge/cli link for an existing project). This installs the InsForge agent skills and writes an AGENTS.md.
+3. Read AGENTS.md, then follow the insforge-cli skill for backend infrastructure and the insforge skill for app code.
+Paste into Claude Code, Cursor, Codex, or any coding agent
+
+================
+Download curl -fsSL https://ollama.com/install.sh | sh
+
+curl -fsSL https://ollama.com/install.sh | sh >>> Removing existing Ollama installation... >>> Downloading Ollama for macOS... ######################################################################## 100.0% >>> Installing Ollama to /Applications... >>> Adding 'ollama' command to PATH (may require password)... >>> Starting Ollama...
+it will fail, but from different terminal run this comand
+ollama run llama3.2:3b --> it will download ollama and bring the terminal
+ollama run llama3.2:3b
+
+pulling manifest
+pulling dde5aa3fc5ff: 100% ▕██████████████████▏ 2.0 GB
+pulling 966de95ca8a6: 100% ▕██████████████████▏ 1.4 KB
+pulling fcc5a6bec9da: 100% ▕██████████████████▏ 7.7 KB
+pulling a70ff7e570d9: 100% ▕██████████████████▏ 6.0 KB
+verifying sha256 digest
+writing manifest
+success
+>>> Send a message (/? for help)
+
+ollama --version
+
+Useful Chat CommandsWhile inside this interactive prompt chat session, you can use special commands by starting with a forward slash (/). Type these directly into the input line:/bye — Closes the chat session and exits back to your normal Mac terminal screen./? — Displays a full list of all available interactive shortcuts and help commands./clear — Wipes out the current conversation history to start fresh.3. Running It Again in the FutureWhenever you restart your Mac or want to chat with the model later on, just follow these two quick terminal steps:Open terminal and start the background engine:bashollama serve
+Use code with caution.Open a new terminal tab (Cmd + T) and launch the model to chat again:bashollama run llama3.2:1b
+Use code with caution.If you want to explore more options, let me know:Do you want to try downloading a slightly more creative 3-billion parameter model (llama3.2:3b)?Would you like assistance connecting this backend engine to a web browser interface so you don't have to chat inside the terminal window?
+ollama serve
+ollama run llama3.2:3b
+=== Install Cluade ====
+curl -fsSL https://claude.ai/install.sh | bash
+Setting up Claude Code...
+
+✔ Claude Code successfully installed!
+
+  Version: 2.1.222
+
+  Location: ~/.local/bin/claude
+
+
+  Next: Run claude --help to get started
+
+⚠ Setup notes:
+  ● Native installation exists but ~/.local/bin is not in your PATH. Run:
+
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
+
+
+✅ Installation complete!
+
+
+=================
+Floci
+
+Floci
+
+# Set up environment
+ export AWS_ENDPOINT_URL=http://localhost:4566
+
+export AWS_DEFAULT_REGION=us-east-1
+
+export AWS_ACCESS_KEY_ID=test
+
+export AWS_SECRET_ACCESS_KEY=test
+
+Or run eval $(floci env) --> for exporting the above env variables
+
+ # Create EKS cluster (Floci spins up a real k3s node)
+ aws eks create-cluster \
+
+    --name dev-cluster \
+
+    --role-arn arn:aws:iam::000000000000:role/eks-role \
+
+    --resources-vpc-config subnetIds=subnet-00000001
+
+ # Pull kubeconfig and use kubectl
+ aws eks update-kubeconfig --name dev-cluster
+
+kubectl run nginx --image=nginx:alpine --port=80
+
+kubectl get pods,svc
+
+ECS Tasks
+
+# Set up environment
+ export AWS_ENDPOINT_URL=http://localhost:4566
+
+ # Register task definition and create cluster
+ aws ecs register-task-definition \
+
+    --family web-task --network-mode bridge \
+
+    --container-definitions '[{"name":"web","image":"nginx:alpine","portMappings":[{"containerPort":80,"hostPort":8081}],"memory":128,"cpu":64}]'
+
+
+aws ecs create-cluster --cluster-name dev-cluster
+
+ # Run a task (Floci launches a real Docker container)
+ aws ecs run-task \
+
+    --cluster dev-cluster \
+
+    --task-definition web-task \
+
+    --count 1
+
+Athena + S3
+
+# Upload data to S3
+ aws s3 mb s3://analytics-bucket
+
+aws s3 cp orders.json s3://analytics-bucket/orders/
+
+ # Register Glue table and run SQL query
+ aws glue create-database --database-input '{"Name":"shop"}'
+
+
+QUERY_ID=$(aws athena start-query-execution \
+
+    --query-string "SELECT customer, SUM(amount) FROM shop.orders GROUP BY customer" \
+
+    --result-configuration '{"OutputLocation":"s3://analytics-bucket/results/"}' \
+
+  --query 'QueryExecutionId' --output text)
+
+
+aws athena get-query-results --query-execution-id $QUERY_ID

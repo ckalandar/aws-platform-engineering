@@ -1,0 +1,13 @@
+{
+    "HostedZones": [
+        {
+            "Id": "/hostedzone/Z0279443763ABCDYC2SS",
+            "Name": "learnsystems.co.",
+            "CallerReference": "1785320044",
+            "Config": {
+                "PrivateZone": false
+            },
+            "ResourceRecordSetCount": 11
+        }
+    ]
+}

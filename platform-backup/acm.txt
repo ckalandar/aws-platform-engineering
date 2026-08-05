@@ -1,0 +1,31 @@
+{
+    "CertificateSummaryList": [
+        {
+            "CertificateArn": "arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9",
+            "DomainName": "*.dev.learnsystems.co",
+            "SubjectAlternativeNameSummaries": [
+                "*.dev.learnsystems.co"
+            ],
+            "HasAdditionalSubjectAlternativeNames": false,
+            "Status": "ISSUED",
+            "Type": "AMAZON_ISSUED",
+            "KeyAlgorithm": "RSA-2048",
+            "KeyUsages": [
+                "DIGITAL_SIGNATURE",
+                "KEY_ENCIPHERMENT"
+            ],
+            "ExtendedKeyUsages": [
+                "TLS_WEB_SERVER_AUTHENTICATION"
+            ],
+            "ExportOption": "DISABLED",
+            "InUse": true,
+            "Exported": false,
+            "RenewalEligibility": "ELIGIBLE",
+            "NotBefore": "2026-07-29T05:30:00+05:30",
+            "NotAfter": "2027-02-12T05:29:59+05:30",
+            "CreatedAt": "2026-07-29T15:51:41.900000+05:30",
+            "IssuedAt": "2026-07-29T16:24:03.629000+05:30",
+            "CertificateKeyPairOrigin": "AWS_MANAGED"
+        }
+    ]
+}

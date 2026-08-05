@@ -1,0 +1,450 @@
+{
+    "Roles": [
+        {
+            "Path": "/",
+            "RoleName": "AmazonEKSAutoClusterRole",
+            "RoleId": "AROAR7XNVRRR6CQHOIETG",
+            "Arn": "arn:aws:iam::136863648867:role/AmazonEKSAutoClusterRole",
+            "CreateDate": "2025-10-28T05:20:13+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "eks.amazonaws.com"
+                        },
+                        "Action": [
+                            "sts:AssumeRole",
+                            "sts:TagSession"
+                        ]
+                    }
+                ]
+            },
+            "Description": "Allows access to other AWS service resources that are required to operate Auto Mode clusters managed by EKS.",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "AmazonEKSAutoNodeRole",
+            "RoleId": "AROAR7XNVRRRQMKO3XKPA",
+            "Arn": "arn:aws:iam::136863648867:role/AmazonEKSAutoNodeRole",
+            "CreateDate": "2025-10-28T05:20:47+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "Description": "Allows EKS nodes to connect to EKS Auto Mode clusters and to pull container images from ECR.",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/aws-service-role/eks.amazonaws.com/",
+            "RoleName": "AWSServiceRoleForAmazonEKS",
+            "RoleId": "AROAR7XNVRRRS6CNVWZ42",
+            "Arn": "arn:aws:iam::136863648867:role/aws-service-role/eks.amazonaws.com/AWSServiceRoleForAmazonEKS",
+            "CreateDate": "2022-06-25T06:56:39+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "eks.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "Description": "Allows Amazon EKS to call AWS services on your behalf.",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/aws-service-role/eks-nodegroup.amazonaws.com/",
+            "RoleName": "AWSServiceRoleForAmazonEKSNodegroup",
+            "RoleId": "AROAR7XNVRRRQ3PPOMTLS",
+            "Arn": "arn:aws:iam::136863648867:role/aws-service-role/eks-nodegroup.amazonaws.com/AWSServiceRoleForAmazonEKSNodegroup",
+            "CreateDate": "2022-06-25T07:08:42+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "eks-nodegroup.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "Description": "This policy allows Amazon EKS to create and manage Nodegroups",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/aws-service-role/autoscaling.amazonaws.com/",
+            "RoleName": "AWSServiceRoleForAutoScaling",
+            "RoleId": "AROAR7XNVRRRZ6BUFYGQJ",
+            "Arn": "arn:aws:iam::136863648867:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling",
+            "CreateDate": "2022-06-25T07:09:01+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "autoscaling.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "Description": "Default Service-Linked Role enables access to AWS Services and Resources used or managed by Auto Scaling",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/aws-service-role/elasticloadbalancing.amazonaws.com/",
+            "RoleName": "AWSServiceRoleForElasticLoadBalancing",
+            "RoleId": "AROAR7XNVRRR7VLJ3PYG6",
+            "Arn": "arn:aws:iam::136863648867:role/aws-service-role/elasticloadbalancing.amazonaws.com/AWSServiceRoleForElasticLoadBalancing",
+            "CreateDate": "2022-06-25T07:27:15+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "elasticloadbalancing.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "Description": "Allows ELB to call AWS services on your behalf.",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/aws-service-role/rds.amazonaws.com/",
+            "RoleName": "AWSServiceRoleForRDS",
+            "RoleId": "AROAR7XNVRRRTGYENZZBI",
+            "Arn": "arn:aws:iam::136863648867:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS",
+            "CreateDate": "2025-10-26T15:49:35+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "rds.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "Description": "Allows Amazon RDS to manage AWS resources on your behalf",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/aws-service-role/resource-explorer-2.amazonaws.com/",
+            "RoleName": "AWSServiceRoleForResourceExplorer",
+            "RoleId": "AROAR7XNVRRRV5NC65SKQ",
+            "Arn": "arn:aws:iam::136863648867:role/aws-service-role/resource-explorer-2.amazonaws.com/AWSServiceRoleForResourceExplorer",
+            "CreateDate": "2025-10-01T15:45:12+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "resource-explorer-2.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/aws-service-role/support.amazonaws.com/",
+            "RoleName": "AWSServiceRoleForSupport",
+            "RoleId": "AROAJOIURP4B2BODJW6KG",
+            "Arn": "arn:aws:iam::136863648867:role/aws-service-role/support.amazonaws.com/AWSServiceRoleForSupport",
+            "CreateDate": "2018-07-23T04:04:32+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "support.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "Description": "Enables resource access for AWS to provide billing, administrative and support services",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/aws-service-role/trustedadvisor.amazonaws.com/",
+            "RoleName": "AWSServiceRoleForTrustedAdvisor",
+            "RoleId": "AROAIPKEHN2F4P3GUTCAA",
+            "Arn": "arn:aws:iam::136863648867:role/aws-service-role/trustedadvisor.amazonaws.com/AWSServiceRoleForTrustedAdvisor",
+            "CreateDate": "2018-07-26T02:58:09+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "trustedadvisor.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "Description": "Access for the AWS Trusted Advisor Service to help reduce cost, increase performance, and improve security of your AWS environment.",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "eksctl_role",
+            "RoleId": "AROAR7XNVRRRZNNTLM6OP",
+            "Arn": "arn:aws:iam::136863648867:role/eksctl_role",
+            "CreateDate": "2022-06-25T06:52:00+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "Description": "Allows EC2 instances to call AWS services on your behalf.",
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "kk-platform-dev-alb-controller",
+            "RoleId": "AROAR7XNVRRR7ZYAJGBAR",
+            "Arn": "arn:aws:iam::136863648867:role/kk-platform-dev-alb-controller",
+            "CreateDate": "2026-07-29T07:20:19+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "arn:aws:iam::136863648867:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113"
+                        },
+                        "Action": "sts:AssumeRoleWithWebIdentity",
+                        "Condition": {
+                            "StringEquals": {
+                                "oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113:sub": "system:serviceaccount:kube-system:aws-load-balancer-controller"
+                            }
+                        }
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "kk-platform-dev-ebs-csi-role",
+            "RoleId": "AROAR7XNVRRRY7KI34ZMM",
+            "Arn": "arn:aws:iam::136863648867:role/kk-platform-dev-ebs-csi-role",
+            "CreateDate": "2026-07-31T10:34:26+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "arn:aws:iam::136863648867:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113"
+                        },
+                        "Action": "sts:AssumeRoleWithWebIdentity",
+                        "Condition": {
+                            "StringEquals": {
+                                "oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+                            }
+                        }
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "kk-platform-dev-eks-cluster-role",
+            "RoleId": "AROAR7XNVRRRTMQURQWKX",
+            "Arn": "arn:aws:iam::136863648867:role/kk-platform-dev-eks-cluster-role",
+            "CreateDate": "2026-07-29T07:08:07+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "eks.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "kk-platform-dev-eks-node-role",
+            "RoleId": "AROAR7XNVRRRTTQJBUJCX",
+            "Arn": "arn:aws:iam::136863648867:role/kk-platform-dev-eks-node-role",
+            "CreateDate": "2026-07-29T07:08:07+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "kk-platform-dev-external-dns",
+            "RoleId": "AROAR7XNVRRR5RSQDK4AM",
+            "Arn": "arn:aws:iam::136863648867:role/kk-platform-dev-external-dns",
+            "CreateDate": "2026-07-29T11:29:50+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "arn:aws:iam::136863648867:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113"
+                        },
+                        "Action": "sts:AssumeRoleWithWebIdentity",
+                        "Condition": {
+                            "StringEquals": {
+                                "oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113:sub": "system:serviceaccount:kube-system:external-dns"
+                            }
+                        }
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "kk-platform-dev-external-secrets",
+            "RoleId": "AROAR7XNVRRR4OYWJLGQU",
+            "Arn": "arn:aws:iam::136863648867:role/kk-platform-dev-external-secrets",
+            "CreateDate": "2026-07-30T10:24:41+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "arn:aws:iam::136863648867:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113"
+                        },
+                        "Action": "sts:AssumeRoleWithWebIdentity",
+                        "Condition": {
+                            "StringEquals": {
+                                "oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113:sub": "system:serviceaccount:external-secrets:external-secrets"
+                            }
+                        }
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "kk-platform-dev-karpenter-controller",
+            "RoleId": "AROAR7XNVRRRWUG6QBZ5C",
+            "Arn": "arn:aws:iam::136863648867:role/kk-platform-dev-karpenter-controller",
+            "CreateDate": "2026-08-01T17:35:03+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "arn:aws:iam::136863648867:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113"
+                        },
+                        "Action": "sts:AssumeRoleWithWebIdentity",
+                        "Condition": {
+                            "StringEquals": {
+                                "oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113:sub": "system:serviceaccount:karpenter:karpenter"
+                            }
+                        }
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "kk-platform-dev-karpenter-node",
+            "RoleId": "AROAR7XNVRRRZZS5YCGKM",
+            "Arn": "arn:aws:iam::136863648867:role/kk-platform-dev-karpenter-node",
+            "CreateDate": "2026-08-01T17:35:03+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        },
+        {
+            "Path": "/",
+            "RoleName": "platform-github-actions-role",
+            "RoleId": "AROAR7XNVRRR2M4POIL66",
+            "Arn": "arn:aws:iam::136863648867:role/platform-github-actions-role",
+            "CreateDate": "2026-07-29T16:29:43+00:00",
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "arn:aws:iam::136863648867:oidc-provider/token.actions.githubusercontent.com"
+                        },
+                        "Action": "sts:AssumeRoleWithWebIdentity",
+                        "Condition": {
+                            "StringEquals": {
+                                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                            },
+                            "StringLike": {
+                                "token.actions.githubusercontent.com:sub": "repo:ckalandar/aws-platform-engineering:*"
+                            }
+                        }
+                    }
+                ]
+            },
+            "MaxSessionDuration": 3600
+        }
+    ]
+}

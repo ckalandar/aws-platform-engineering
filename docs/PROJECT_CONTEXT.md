@@ -19695,3 +19695,644 @@ Build Service Mesh.
 Add ArgoCD Image Updater as part of the Platform Engineering phase and remove the manual image management concern entirely.
 
 That keeps us moving through the roadmap instead of getting blocked by release automation details before the rollout feature itself is validated.
+
+Before terminating, I would do three things:
+
+1. Save Evidence
+
+Create a folder:
+
+mkdir platform-backup
+cd platform-backup
+
+Export everything:
+
+kubectl get applications -A -o yaml > argocd-apps.yaml
+
+kubectl get gateway,virtualservice,destinationrule -A -o yaml > istio.yaml
+
+kubectl get ingress -A -o yaml > ingress.yaml
+
+kubectl get rollout -A -o yaml > rollouts.yaml
+
+kubectl get externalsecret -A -o yaml > external-secrets.yaml
+
+kubectl get svc -A -o yaml > services.yaml
+
+kubectl get all -A -o yaml > full-cluster-backup.yaml
+
+Export ArgoCD app list:
+
+kubectl get applications -A
+
+Save output in:
+
+argocd-applications.txt
+2. Verify GitOps Source of Truth
+
+Confirm:
+
+git status
+
+Should show:
+
+nothing to commit
+working tree clean
+
+Push everything:
+
+git add .
+git commit -m "final platform state before teardown"
+git push
+3. Document Critical AWS Resources
+
+Save:
+
+aws eks list-clusters
+
+aws route53 list-hosted-zones
+
+aws acm list-certificates --region us-east-1
+
+aws iam list-roles
+
+Particularly note:
+
+Hosted Zone ID
+ACM Certificate ARN
+EKS Cluster Name
+Terraform State Bucket
+DynamoDB Lock Table
+Destruction Order
+
+Never start by deleting EKS manually.
+
+Let Terraform unwind dependencies.
+
+Step 1 — Delete GitOps Applications
+
+Optional but cleaner.
+
+kubectl delete application --all -n argocd
+
+Wait:
+
+kubectl get application -n argocd
+
+Should be empty.
+
+This removes:
+
+Istio
+Monitoring
+Rollouts
+Springboot
+ExternalDNS
+ExternalSecrets
+Karpenter
+Step 2 — Destroy Infrastructure
+
+Go to environment:
+
+cd infrastructure/environments/dev
+
+Check:
+
+terraform plan -destroy
+
+Review carefully.
+
+Then:
+
+terraform destroy
+
+Expected removal:
+
+EKS
+NodeGroups
+Karpenter resources
+Security Groups
+NAT Gateway
+Subnets
+Route Tables
+VPC
+
+This can take 15–30 minutes.
+
+Step 3 — Verify No Load Balancers Remain
+
+This is important because they cost money.
+
+aws elbv2 describe-load-balancers \
+--region us-east-1
+
+Should return:
+
+[]
+
+or at least no platform-related LBs.
+
+Look specifically for:
+
+k8s-*
+
+load balancers.
+
+Step 4 — Verify NAT Gateway Removed
+
+NAT Gateways are one of the biggest lab costs.
+
+aws ec2 describe-nat-gateways \
+--region us-east-1
+
+Should be:
+
+deleted
+
+or empty.
+
+Step 5 — Verify EKS Gone
+aws eks list-clusters
+
+Expected:
+
+{
+  "clusters": []
+}
+Step 6 — Verify Public IPv4 Cleanup
+
+Check:
+
+aws ec2 describe-addresses
+
+No stray Elastic IPs should remain.
+
+Step 7 — Verify Route53 Records
+
+If Hosted Zone is Terraform-managed:
+
+Terraform should remove records.
+
+Check:
+
+aws route53 list-resource-record-sets \
+--hosted-zone-id <zone-id>
+
+Verify no unexpected records remain.
+
+Step 8 — Verify ACM Certificates
+
+If ACM is Terraform-managed:
+
+aws acm list-certificates \
+--region us-east-1
+
+Should not show platform certificates.
+
+If you plan to recreate soon, you may choose to keep the certificate and hosted zone.
+
+Step 9 — Bootstrap Decision
+
+You have two choices.
+
+Option A (Recommended)
+
+Keep:
+
+Terraform State Bucket
+Terraform Lock Table
+GitHub OIDC Role
+
+Cost is tiny.
+
+Benefits:
+
+Faster rebuild
+State backend already exists
+
+Destroy only:
+
+Infrastructure
+EKS
+Workloads
+Option B
+
+Destroy everything.
+
+Go to:
+
+cd bootstrap
+
+Run:
+
+terraform destroy
+
+Removes:
+
+S3 State Bucket
+DynamoDB Table
+OIDC Role
+
+Only do this if you want a completely clean rebuild later.
+
+Final Verification Checklist
+[ ] Git pushed
+
+[ ] Cluster backups exported
+
+[ ] Terraform destroy completed
+
+[ ] EKS removed
+
+[ ] Load balancers removed
+
+[ ] NAT gateways removed
+
+[ ] Elastic IPs removed
+
+[ ] Route53 verified
+
+[ ] ACM verified
+
+[ ] No unexpected AWS resources remaining
+
+For your situation, I would choose:
+
+KEEP:
+- Bootstrap state bucket
+- DynamoDB lock table
+- GitHub OIDC role
+- Route53 hosted zone
+- ACM certificate
+
+DESTROY:
+- EKS
+- VPC
+- NAT Gateway
+- Load Balancers
+- Karpenter
+- Monitoring
+- Istio
+- Applications
+
+That gives you nearly zero ongoing cost while making it much easier to rebuild the platform later in AWS after you've practiced locally with Floki/Flock, Kind, or k3d.
+
+what do I do with these? Error: deleting EC2 Subnet (subnet-096678ff8574332c8): operation error EC2: DeleteSubnet, https response error StatusCode: 400, RequestID: abd9c0ad-a812-4be8-a1c6-da2b4adcdd7d, api error DependencyViolation: The subnet 'subnet-096678ff8574332c8' has dependencies and cannot be deleted.
+│
+│
+╵
+╷
+│ Error: deleting EC2 Internet Gateway (igw-01e2fd862de96b550): detaching EC2 Internet Gateway (igw-01e2fd862de96b550) from VPC (vpc-0c52e44ef7fe0b245): operation error EC2: DetachInternetGateway, https response error StatusCode: 400, RequestID: e2f34144-01bb-49bd-ab17-cf18d070d5ef, api error DependencyViolation: Network vpc-0c52e44ef7fe0b245 has some mapped public address(es). Please unmap those public address(es) before detaching the gateway.
+│
+│
+╵
+╷
+│ Error: deleting EC2 Subnet (subnet-0f7e99cac1758bf99): operation error EC2: DeleteSubnet, https response error StatusCode: 400, RequestID: e8ea7909-402f-4363-8d74-0635010d8c99, api error DependencyViolation: The subnet 'subnet-0f7e99cac1758bf99' has dependencies and cannot be deleted.
+
+This is very common when destroying EKS environments.
+
+Terraform is telling you:
+
+Subnet has dependencies
+Internet Gateway has mapped public addresses
+
+which means something inside AWS is still attached to those subnets/VPC and Terraform cannot remove the networking resources.
+
+First: Find What Is Still Using Those Subnets
+
+Check both subnets:
+
+aws ec2 describe-network-interfaces \
+--filters Name=subnet-id,Values=subnet-096678ff8574332c8
+
+and
+
+aws ec2 describe-network-interfaces \
+--filters Name=subnet-id,Values=subnet-0f7e99cac1758bf99
+
+Look for:
+
+ENIs
+ALBs
+NLBs
+EKS managed interfaces
+VPC endpoints
+
+These are usually the culprit.
+
+Check Load Balancers
+
+The most likely cause is that AWS Load Balancer Controller created resources that Terraform does not own.
+
+List all load balancers:
+
+aws elbv2 describe-load-balancers \
+--region us-east-1 \
+--output table
+
+You previously had:
+
+k8s-istiosys-istioing...
+k8s-demo-nginx...
+k8s-monitori...
+k8s-springbo...
+
+If any still exist:
+
+aws elbv2 delete-load-balancer \
+--load-balancer-arn <ARN>
+
+Wait several minutes.
+
+Check Target Groups
+
+Even after the LB is deleted:
+
+aws elbv2 describe-target-groups
+
+If any k8s target groups remain:
+
+aws elbv2 delete-target-group \
+--target-group-arn <ARN>
+Check EKS ENIs
+
+EKS loves leaving ENIs behind.
+
+Run:
+
+aws ec2 describe-network-interfaces \
+--filters Name=vpc-id,Values=vpc-0c52e44ef7fe0b245 \
+--query 'NetworkInterfaces[*].[NetworkInterfaceId,Description,Status]'
+--output table
+
+Typical output:
+
+eni-xxxxx
+Amazon EKS ...
+
+eni-yyyyy
+ELB net/...
+
+eni-zzzzz
+aws-K8S...
+
+These must disappear before subnets can be deleted.
+
+Check NAT Gateways
+
+You had NAT gateways in this environment.
+
+Verify:
+
+aws ec2 describe-nat-gateways \
+--filter Name=vpc-id,Values=vpc-0c52e44ef7fe0b245
+
+If still present:
+
+aws ec2 delete-nat-gateway \
+--nat-gateway-id nat-xxxxxxxx
+
+Wait until:
+
+deleted
+Check Elastic IPs
+
+The IGW error:
+
+has some mapped public address(es)
+
+usually means:
+
+NAT Gateway EIP
+EC2 public IP
+Load Balancer public IP
+
+Check:
+
+aws ec2 describe-addresses
+
+Look for:
+
+AssociationId
+
+and resources still attached.
+
+Check Remaining EC2 Instances
+
+Sometimes Karpenter nodes survive.
+
+Verify:
+
+aws ec2 describe-instances \
+--filters Name=vpc-id,Values=vpc-0c52e44ef7fe0b245 \
+--query 'Reservations[*].Instances[*].[InstanceId,State.Name]'
+--output table
+
+If anything exists:
+
+aws ec2 terminate-instances \
+--instance-ids <id>
+Fastest Way to Identify the Blocker
+
+Run this:
+
+aws ec2 describe-network-interfaces \
+--filters Name=vpc-id,Values=vpc-0c52e44ef7fe0b245 \
+--output table
+
+and paste the output.
+
+That single command usually reveals exactly what is preventing:
+
+Subnet deletion
+Internet Gateway detachment
+VPC deletion
+
+In EKS environments, 90% of the time the remaining dependency is an ENI created by a Load Balancer, EKS control plane, or Karpenter node that hasn't fully cleaned up yet.
+
+Pasted text(19).txt
+Document
+
+These errors are very common when destroying an EKS-based platform. They mean AWS resources still exist that Terraform cannot remove automatically because something is still attached to the VPC.
+
+What the errors mean
+1. Subnet DependencyViolation
+DeleteSubnet
+DependencyViolation: The subnet has dependencies and cannot be deleted
+
+Something is still using the subnet:
+
+Load Balancer (ALB/NLB)
+NAT Gateway
+ENI (Elastic Network Interface)
+EKS-managed network interfaces
+EC2 instance
+VPC Endpoint
+RDS
+EFS mount targets
+2. Internet Gateway DependencyViolation
+DetachInternetGateway
+Network vpc-xxxxx has some mapped public address(es)
+
+This usually means one of these still exists:
+
+NAT Gateway with Elastic IP
+Load Balancer
+EC2 instance with public IP
+EKS-created ENIs
+
+The IGW cannot detach until all public IP mappings are gone.
+
+First identify what is left
+
+Replace with your VPC:
+
+export VPC_ID=vpc-0c52e44ef7fe0b245
+Check Load Balancers
+aws elbv2 describe-load-balancers \
+--query 'LoadBalancers[*].[LoadBalancerArn,DNSName]' \
+--output table
+
+Look for:
+
+k8s-...
+
+or any ALB/NLB still running.
+
+Check Target Groups
+aws elbv2 describe-target-groups \
+--output table
+Check ENIs
+
+This is usually the culprit.
+
+aws ec2 describe-network-interfaces \
+--filters Name=vpc-id,Values=$VPC_ID \
+--query 'NetworkInterfaces[*].[NetworkInterfaceId,Description,Status]' \
+--output table
+
+Typical results:
+
+ELB app/...
+ELB net/...
+amazon-eks
+Check NAT Gateways
+aws ec2 describe-nat-gateways \
+--filter Name=vpc-id,Values=$VPC_ID \
+--query 'NatGateways[*].[NatGatewayId,State]' \
+--output table
+
+If present:
+
+aws ec2 delete-nat-gateway \
+--nat-gateway-id nat-xxxxxxxx
+
+Wait until:
+
+deleted
+Check EIPs
+aws ec2 describe-addresses \
+--query 'Addresses[*].[AllocationId,PublicIp]' \
+--output table
+Check EKS Cluster
+aws eks list-clusters
+
+If cluster still exists:
+
+aws eks delete-cluster \
+--name <cluster-name>
+Check Nodegroups
+aws eks list-nodegroups \
+--cluster-name <cluster-name>
+
+Delete them first:
+
+aws eks delete-nodegroup \
+--cluster-name <cluster-name> \
+--nodegroup-name <nodegroup-name>
+Most likely cause in your case
+
+Looking through our platform history, the most likely leftovers are:
+
+Istio NLB
+k8s-istiosys-istioing-...
+SpringBoot ALB
+k8s-springbo-springbo-...
+Grafana ALB
+k8s-monitori-monitori-...
+Nginx demo ALB
+k8s-demo-nginx-...
+AWS Load Balancer Controller-created ENIs
+EKS cluster ENIs
+
+These are exactly the resources that prevent subnet and IGW deletion.
+
+Fastest cleanup method
+
+If Terraform destroy is already failing:
+
+Step 1
+
+Delete ArgoCD apps:
+
+kubectl delete application --all -n argocd
+
+Wait until:
+
+kubectl get ingress -A
+
+returns nothing.
+
+Step 2
+
+Delete EKS cluster
+
+terraform destroy -target=module.eks
+
+or
+
+eksctl delete cluster --name <cluster>
+
+(if created by eksctl)
+
+Step 3
+
+Wait 10-15 minutes
+
+AWS Load Balancer Controller needs time to delete:
+
+ALBs
+NLBs
+Target Groups
+ENIs
+Step 4
+
+Run:
+
+terraform destroy
+
+again.
+
+Before terminating everything
+
+Since you are moving to local experimentation, I would recommend:
+
+Commit all Git repos.
+Tag the current working state:
+git tag platform-v1-final
+git push --tags
+Save:
+PLATFORM-REBUILD.md
+PLATFORM-JOURNAL.md
+Terraform state backup
+terraform state pull > backup.tfstate
+Then destroy the environment.
+
+For your specific errors, the next command I would run is:
+
+aws ec2 describe-network-interfaces \
+--filters Name=vpc-id,Values=vpc-0c52e44ef7fe0b245 \
+--query 'NetworkInterfaces[*].[NetworkInterfaceId,Description,Status]' \
+--output table
+
+That will almost certainly reveal the resource blocking subnet deletion. Paste the output and I can identify exactly what must be removed.

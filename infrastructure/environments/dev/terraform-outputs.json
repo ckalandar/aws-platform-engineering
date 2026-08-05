@@ -1,0 +1,104 @@
+{
+  "account_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "136863648867"
+  },
+  "alb_sg_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "sg-0ff6d0fe1abec7cbb"
+  },
+  "cluster_endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://AF26FC10DEFD4735F4B0A57806441113.gr7.us-east-1.eks.amazonaws.com"
+  },
+  "cluster_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "kk-platform-dev"
+  },
+  "ecr_repository_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo"
+  },
+  "eks_cluster_sg_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "sg-0678862d604b46ff2"
+  },
+  "eks_node_sg_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "sg-08c5895592b03dac0"
+  },
+  "node_group_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "general"
+  },
+  "oidc_provider_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "oidc.eks.us-east-1.amazonaws.com/id/AF26FC10DEFD4735F4B0A57806441113"
+  },
+  "private_app_subnet_ids": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-0320977797093e0d5",
+      "subnet-01d927bba3b6fb704"
+    ]
+  },
+  "private_db_subnet_ids": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-0ade7b5431401c36e",
+      "subnet-0c0990d5284690f0e"
+    ]
+  },
+  "public_subnet_ids": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-0f7e99cac1758bf99",
+      "subnet-096678ff8574332c8"
+    ]
+  },
+  "rds_sg_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "sg-09a2e3a11c88e5384"
+  },
+  "region": {
+    "sensitive": false,
+    "type": "string",
+    "value": "us-east-1"
+  },
+  "vpc_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "vpc-0c52e44ef7fe0b245"
+  }
+}
