@@ -92,7 +92,7 @@ resource "aws_iam_role_policy_attachment" "ecr_policy" {
 
 resource "aws_iam_role_policy_attachment" "ssm" {
 
-  role       = aws_iam_role.node_group.name
+  role = aws_iam_role.node_group.name
 
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
@@ -103,10 +103,10 @@ resource "aws_iam_role_policy_attachment" "ssm" {
 
 #resource "aws_cloudwatch_log_group" "eks" {
 
- # name              = "/aws/eks/${var.project_name}-${var.environment}/cluster"
-  #retention_in_days = 30
+# name              = "/aws/eks/${var.project_name}-${var.environment}/cluster"
+#retention_in_days = 30
 
-  #tags = local.common_tags
+#tags = local.common_tags
 #}
 
 #######################################

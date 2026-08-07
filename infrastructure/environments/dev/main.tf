@@ -39,6 +39,8 @@ module "eks" {
 
   eks_node_sg_id    = module.security_groups.eks_node_sg_id
   eks_cluster_sg_id = module.security_groups.eks_cluster_sg_id
+
+  manage_oidc = false
 }
 
 module "platform" {

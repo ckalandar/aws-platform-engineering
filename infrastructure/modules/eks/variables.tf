@@ -22,3 +22,9 @@ variable "eks_version" {
   type    = string
   default = "1.33"
 }
+
+variable "manage_oidc" {
+  description = "When true, create the EKS IAM OIDC provider. Set false for floci/LocalStack where CreateOpenIDConnectProvider is unsupported."
+  type        = bool
+  default     = true
+}

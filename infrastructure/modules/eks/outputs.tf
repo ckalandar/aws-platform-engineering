@@ -20,7 +20,7 @@ output "node_group_name" {
 
 output "oidc_provider_arn" {
   description = "OIDC Provider ARN"
-  value       = aws_iam_openid_connect_provider.eks.arn
+  value       = var.manage_oidc ? aws_iam_openid_connect_provider.eks[0].arn : "arn:aws:iam::000000000000:oidc-provider/oidc.eks.localhost/id/floci"
 }
 
 output "oidc_issuer_url" {
@@ -34,9 +34,9 @@ output "cluster_certificate_authority_data" {
 
 output "oidc_provider_url" {
   description = "OIDC provider URL without https://"
-  value = replace(
-    aws_iam_openid_connect_provider.eks.url,
+  value = var.manage_oidc ? replace(
+    aws_iam_openid_connect_provider.eks[0].url,
     "https://",
     ""
-  )
+  ) : "oidc.eks.localhost/id/floci"
 }

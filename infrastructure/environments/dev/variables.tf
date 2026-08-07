@@ -32,3 +32,9 @@ variable "private_db_subnet_cidrs" {
   description = "CIDR blocks for private database subnets"
   type        = list(string)
 }
+
+variable "localstack_endpoint" {
+  description = "Endpoint URL for floci/LocalStack AWS service emulation."
+  type        = string
+  default     = "http://localhost:4566"
+}

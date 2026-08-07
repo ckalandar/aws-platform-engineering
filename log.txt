@@ -50,7 +50,32 @@ Setting up Claude Code...
 
 ✅ Installation complete!
 
+ollama launch claude --model llama3.2:3b
+llama3.2:3b does not work well with Claude Code. Try an agent-capable model like
+  ollama launch claude --model glm-5.2:cloud
 
+Launch with llama3.2:3b anyway?
+
+   Launch anyway    Pick another model
+
+   ollama launch claude --model llama3.2:3b
+Select model for Claude Code: Type to filter...
+
+  Recommended
+  ▸ glm-5.2:cloud (Sign in required)
+      Long-horizon coding and agentic engineering with a solid 1M context
+    kimi-k2.7-code:cloud
+      Coding-focused long-horizon agentic workflows with improved token efficien
+    minimax-m3:cloud
+      State-of-the-art coding & agent capabilities with multimodal reasoning and
+    nemotron-3-super:cloud
+      Reasoning, coding, and agentic tool use
+    gemma4:12b
+      Agentic workflows and multimodal reasoning, ~12GB, (not downloaded)
+    qwen3.6
+      Agentic software engineering model with multimodal capabilities, ~28GB, (n
+
+select any cloud ones
 =================
 Floci
 

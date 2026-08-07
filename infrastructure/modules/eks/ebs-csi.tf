@@ -10,14 +10,14 @@ data "aws_iam_policy_document" "ebs_csi_assume_role" {
       type = "Federated"
 
       identifiers = [
-        aws_iam_openid_connect_provider.eks.arn
+        var.manage_oidc ? aws_iam_openid_connect_provider.eks[0].arn : "arn:aws:iam::000000000000:oidc-provider/oidc.eks.localhost/id/floci"
       ]
     }
 
     condition {
       test = "StringEquals"
 
-      variable = "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub"
+      variable = "${var.manage_oidc ? replace(aws_iam_openid_connect_provider.eks[0].url, "https://", "") : "oidc.eks.localhost/id/floci"}:sub"
 
       values = [
         "system:serviceaccount:kube-system:ebs-csi-controller-sa"
