@@ -3,6 +3,11 @@ deploymentMode: SingleBinary
 singleBinary:
   replicas: 1
 
+  persistence:
+    enabled: true
+    storageClass: local-path
+    size: 20Gi
+
 loki:
   auth_enabled: false
 
@@ -22,13 +27,6 @@ loki:
         index:
           prefix: loki_index_
           period: 24h
-
-persistence:
-  enabled: true
-
-  storageClassName: local-path
-
-  size: 20Gi
 
 chunksCache:
   enabled: false
