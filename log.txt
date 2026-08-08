@@ -1,3 +1,6 @@
+to run claude from terminal
+claude .
+
 Set up InsForge as the backend for this project.
 1. Sign in: npx @insforge/cli login --user-api-key uak__JWECidonhNxQkO3hSqQLaXqPPIfhpyXHO-YBqQdN4U
 2. Run npx @insforge/cli create to create a project linked to this directory (or npx @insforge/cli link for an existing project). This installs the InsForge agent skills and writes an AGENTS.md.

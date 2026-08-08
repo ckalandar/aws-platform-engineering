@@ -24,6 +24,8 @@ module "security_groups" {
   environment  = local.common.environment
 
   vpc_id = module.vpc.vpc_id
+
+  localstack_endpoint = var.localstack_endpoint
 }
 
 ## EKS Cluster
@@ -41,6 +43,10 @@ module "eks" {
   eks_cluster_sg_id = module.security_groups.eks_cluster_sg_id
 
   manage_oidc = false
+
+  manage_addons          = false
+  attach_ebs_csi_policy = false
+  cluster_log_types     = []
 }
 
 module "platform" {
@@ -87,10 +93,6 @@ module "ecr" {
 
 # External DNS IRSA
 #
-data "aws_route53_zone" "main" {
-  name         = "learnsystems.co"
-  private_zone = false
-}
 module "external_dns_irsa" {
 
   source = "../../modules/external-dns-irsa"
@@ -101,7 +103,7 @@ module "external_dns_irsa" {
 
   oidc_provider_url = module.eks.oidc_provider_url
 
-  hosted_zone_id = data.aws_route53_zone.main.zone_id
+  hosted_zone_id = var.hosted_zone_id
 
   project_name = var.project_name
 

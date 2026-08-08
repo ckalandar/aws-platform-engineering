@@ -10,9 +10,10 @@ provider "aws" {
   skip_region_validation      = true
 
   endpoints {
-    dynamodb = var.localstack_endpoint
-    iam      = var.localstack_endpoint
-    s3       = var.localstack_endpoint
-    sts      = var.localstack_endpoint
+    dynamodb   = var.localstack_endpoint
+    iam        = var.localstack_endpoint
+    s3         = var.localstack_endpoint
+    s3control  = var.localstack_endpoint
+    sts        = var.localstack_endpoint
   }
 }

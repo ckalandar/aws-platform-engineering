@@ -25,7 +25,7 @@ output "oidc_provider_arn" {
 
 output "oidc_issuer_url" {
   description = "OIDC Issuer URL"
-  value       = aws_eks_cluster.this.identity[0].oidc[0].issuer
+  value       = length(aws_eks_cluster.this.identity) > 0 && length(aws_eks_cluster.this.identity[0].oidc) > 0 ? aws_eks_cluster.this.identity[0].oidc[0].issuer : "https://oidc.eks.localhost/id/floci"
 }
 
 output "cluster_certificate_authority_data" {

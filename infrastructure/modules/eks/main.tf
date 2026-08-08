@@ -120,13 +120,7 @@ resource "aws_eks_cluster" "this" {
 
   version = var.eks_version
 
-  enabled_cluster_log_types = [
-    "api",
-    "audit",
-    "authenticator",
-    "controllerManager",
-    "scheduler"
-  ]
+  enabled_cluster_log_types = var.cluster_log_types
 
   vpc_config {
 

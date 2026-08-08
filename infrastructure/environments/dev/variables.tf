@@ -38,3 +38,9 @@ variable "localstack_endpoint" {
   type        = string
   default     = "http://localhost:4566"
 }
+
+variable "hosted_zone_id" {
+  description = "Route53 hosted zone ID used by External DNS. Defaults to a deterministic floci placeholder."
+  type        = string
+  default     = "Z00000000000000000000"
+}

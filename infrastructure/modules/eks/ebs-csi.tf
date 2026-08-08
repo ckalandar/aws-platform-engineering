@@ -34,6 +34,7 @@ resource "aws_iam_role" "ebs_csi" {
 }
 
 resource "aws_iam_role_policy_attachment" "ebs_csi" {
+  count = var.attach_ebs_csi_policy ? 1 : 0
 
   role = aws_iam_role.ebs_csi.name
 

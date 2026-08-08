@@ -28,3 +28,21 @@ variable "manage_oidc" {
   type        = bool
   default     = true
 }
+
+variable "manage_addons" {
+  description = "When true, create managed EKS add-ons. Set false for floci/LocalStack where CreateAddon is unsupported."
+  type        = bool
+  default     = true
+}
+
+variable "attach_ebs_csi_policy" {
+  description = "When true, attach the AWS-managed AmazonEBSCSIDriverPolicy. Set false for floci/LocalStack where AWS-managed policies may not exist."
+  type        = bool
+  default     = true
+}
+
+variable "cluster_log_types" {
+  description = "List of EKS control plane log types to enable. Set to empty list for floci/LocalStack where UpdateClusterConfig is unsupported."
+  type        = list(string)
+  default     = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+}
