@@ -17,7 +17,7 @@ spec:
 
   source:
     repoURL: https://github.com/ckalandar/aws-platform-engineering.git
-    targetRevision: main
+    targetRevision: dev-floci
     path: gitops/bootstrap/prometheus-crds
 
   syncPolicy:

@@ -72,6 +72,8 @@ prometheus:
           accessModes:
             - ReadWriteOnce
 
+          storageClassName: local-path
+
           resources:
 
             requests:
@@ -89,6 +91,8 @@ alertmanager:
 
           accessModes:
             - ReadWriteOnce
+
+          storageClassName: local-path
 
           resources:
 

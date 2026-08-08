@@ -29,7 +29,7 @@ spec:
 
         - name: springboot
 
-          image: 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:b67b86c333347d00e7828fe334e5eaa651608343
+          image: localhost:5100/platform-demo:floci-dev
 
           imagePullPolicy: Always
 

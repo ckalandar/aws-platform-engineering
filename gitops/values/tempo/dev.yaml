@@ -5,7 +5,7 @@ tempo:
 persistence:
   enabled: true
 
-  storageClassName: gp3
+  storageClassName: local-path
 
   size: 10Gi
 

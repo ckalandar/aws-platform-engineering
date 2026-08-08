@@ -6,3 +6,4 @@ resources:
   - allow-dns.yaml
   - allow-monitoring.yaml
   - allow-ingress.yaml
+  - allow-istiod.yaml
