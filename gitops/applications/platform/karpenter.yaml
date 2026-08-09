@@ -26,7 +26,9 @@ spec:
 
           settings:
             clusterName: kk-platform-dev
-            clusterEndpoint: https://AF26FC10DEFD4735F4B0A57806441113.gr7.us-east-1.eks.amazonaws.com
+            clusterEndpoint: https://localhost:6501
+
+          replicas: 0
 
   syncPolicy:
     automated:
