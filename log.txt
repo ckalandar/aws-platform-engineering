@@ -156,3 +156,113 @@ QUERY_ID=$(aws athena start-query-execution \
 
 
 aws athena get-query-results --query-execution-id $QUERY_ID
+
+---
+Accessing Your Cluster Services
+
+Your cluster is a K3s dev cluster running in Docker (floci-eks-kk-platform-dev). The API server is tunneled to localhost:6501. The ALB ingress controller can't work (no AWS IMDS available), so you need to access services via kubectl port-forward.
+
+Here's everything you need:
+
+---
+1. ArgoCD — Admin Login
+
+# Get the admin password
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+
+Password: 4gznRCui72QpPXTE
+
+Access via port-forward:
+kubectl port-forward -n argocd svc/argocd-server 8080:80
+Then open http://localhost:8080 — login as admin with the password above.
+
+---
+2. Grafana
+
+kubectl port-forward -n monitoring svc/monitoring-grafana 8081:80
+Then open http://localhost:8081
+
+Default credentials (if unchanged): admin / prom-operator (check kube-prometheus-stack defaults)
+
+---
+3. Prometheus
+
+kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 9090:9090
+Then open http://localhost:9090
+
+---
+4. Alertmanager
+
+kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-alertmanager 9093:9093
+Then open http://localhost:9093
+
+---
+5. Spring Boot Application
+
+The app has both an ALB ingress (failing) and an Istio Gateway/VirtualService. Two ways to reach it:
+
+Via port-forward (direct):
+kubectl port-forward -n springboot svc/springboot-canary 8082:80
+Then open http://localhost:8082
+
+Via Istio ingress gateway (as the VirtualService intended):
+# Forward the Istio ingress gateway's HTTP port
+kubectl port-forward -n istio-system svc/istio-ingressgateway 8083:80
+Then curl with the proper Host header:
+curl -H "Host: springboot.dev.learnsystems.co" http://localhost:8083
+
+---
+6. Loki (logs)
+
+kubectl port-forward -n loki svc/loki 3100:3100
+Then query at http://localhost:3100 (Loki HTTP API / readiness endpoint)
+
+---
+7. Tempo (traces)
+
+kubectl port-forward -n tempo svc/tempo 3200:3200
+Then query at http://localhost:3200 (Tempo HTTP API)
+
+---
+8. Demo Nginx App
+
+kubectl port-forward -n demo svc/nginx 8084:80
+Then open http://localhost:8084
+
+---
+9. Istio Ingress Gateway (direct LoadBalancer)
+
+The gateway has a private IP 10.0.0.55 (Docker network internal). If you need to reach it externally, you could add a Docker port mapping for the host:
+
+# Stop the container, re-run with these ports exposed:
+# docker run ... -p 8085:80 -p 8443:443 ... floci-eks-kk-platform-dev
+
+But port-forwarding individual services (above) is simpler for dev work.
+
+---
+Quick Reference — One-Liner Port-Forwards
+
+I'd recommend running these in separate terminal tabs or backgrounding them:
+
+# Terminal 1: ArgoCD
+kubectl port-forward -n argocd svc/argocd-server 8080:80
+
+# Terminal 2: Grafana
+kubectl port-forward -n monitoring svc/monitoring-grafana 8081:80
+
+# Terminal 3: Prometheus
+kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 9090:9090
+
+# Terminal 4: Spring Boot
+kubectl port-forward -n springboot svc/springboot-canary 8082:80
+
+# Terminal 5: Alertmanager
+kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-alertmanager 9093:9093
+
+TL;DR — Start here:
+1. Port-forward ArgoCD on :8080 → login with admin / 4gznRCui72QpPXTE
+2. Port-forward Grafana on :8081 → dashboards are there
+3. Port-forward Spring Boot on :8082 → your app
+4. Port-forward Prometheus on :9090 → metrics
+
+The ALB ingress setup won't work on this K3s dev cluster — it's designed for EKS. If you want DNS-based access, you could switch those ingresses to use the Istio Gateway instead (which works fine, since the Istio ingress gateway is running).
