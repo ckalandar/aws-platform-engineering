@@ -36,6 +36,8 @@ spec:
           env:
             - name: SERVER_ADDRESS
               value: "0.0.0.0"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Djava.net.preferIPv4Stack=true"
 
           ports:
             - containerPort: 8080
