@@ -6680,7 +6680,7 @@ items:
     - ""
     summary:
       externalURLs:
-      - http://grafana.dev.learnsystems.co/
+      - http://grafana.floci.bright.zorbos.com/
       images:
       - docker.io/grafana/grafana:12.1.1
       - quay.io/kiwigrid/k8s-sidecar:1.30.10
@@ -8502,7 +8502,7 @@ items:
     sourceType: Kustomize
     summary:
       externalURLs:
-      - http://springboot.dev.learnsystems.co/
+      - http://springboot.floci.bright.zorbos.com/
       images:
       - 136863648867.dkr.ecr.us-east-1.amazonaws.com/platform-demo:b67b86c333347d00e7828fe334e5eaa651608343
       - docker.io/istio/proxyv2:1.28.0

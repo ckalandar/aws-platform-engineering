@@ -7,7 +7,7 @@ metadata:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
 
-    external-dns.alpha.kubernetes.io/hostname: springboot.dev.learnsystems.co
+    external-dns.alpha.kubernetes.io/hostname: springboot.floci.bright.zorbos.com
 
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:136863648867:certificate/b301e760-5bdb-4261-9b6f-b51d87c8b1a9
 
@@ -19,7 +19,7 @@ spec:
   ingressClassName: alb
 
   rules:
-    - host: springboot.dev.learnsystems.co
+    - host: springboot.floci.bright.zorbos.com
       http:
         paths:
           - path: /

@@ -12,7 +12,7 @@ registry: txt
 txtOwnerId: kk-platform-dev
 
 domainFilters:
-  - learnsystems.co
+  - floci.bright.zorbos.com
 
 sources:
   - ingress

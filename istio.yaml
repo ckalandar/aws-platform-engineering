@@ -6,7 +6,7 @@ items:
     annotations:
       argocd.argoproj.io/tracking-id: springboot:networking.istio.io/Gateway:springboot/springboot-gateway
       kubectl.kubernetes.io/last-applied-configuration: |
-        {"apiVersion":"networking.istio.io/v1","kind":"Gateway","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"springboot:networking.istio.io/Gateway:springboot/springboot-gateway"},"name":"springboot-gateway","namespace":"springboot"},"spec":{"selector":{"istio":"ingressgateway"},"servers":[{"hosts":["springboot.dev.learnsystems.co"],"port":{"name":"http","number":80,"protocol":"HTTP"}}]}}
+        {"apiVersion":"networking.istio.io/v1","kind":"Gateway","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"springboot:networking.istio.io/Gateway:springboot/springboot-gateway"},"name":"springboot-gateway","namespace":"springboot"},"spec":{"selector":{"istio":"ingressgateway"},"servers":[{"hosts":["springboot.floci.bright.zorbos.com"],"port":{"name":"http","number":80,"protocol":"HTTP"}}]}}
     creationTimestamp: "2026-08-02T14:34:59Z"
     generation: 1
     name: springboot-gateway
@@ -18,7 +18,7 @@ items:
       istio: ingressgateway
     servers:
     - hosts:
-      - springboot.dev.learnsystems.co
+      - springboot.floci.bright.zorbos.com
       port:
         name: http
         number: 80
@@ -29,7 +29,7 @@ items:
     annotations:
       argocd.argoproj.io/tracking-id: springboot:networking.istio.io/VirtualService:springboot/springboot
       kubectl.kubernetes.io/last-applied-configuration: |
-        {"apiVersion":"networking.istio.io/v1","kind":"VirtualService","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"springboot:networking.istio.io/VirtualService:springboot/springboot"},"name":"springboot","namespace":"springboot"},"spec":{"gateways":["springboot-gateway"],"hosts":["springboot.dev.learnsystems.co"],"http":[{"name":"primary","route":[{"destination":{"host":"springboot"},"weight":100},{"destination":{"host":"springboot-canary"},"weight":0}]}]}}
+        {"apiVersion":"networking.istio.io/v1","kind":"VirtualService","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"springboot:networking.istio.io/VirtualService:springboot/springboot"},"name":"springboot","namespace":"springboot"},"spec":{"gateways":["springboot-gateway"],"hosts":["springboot.floci.bright.zorbos.com"],"http":[{"name":"primary","route":[{"destination":{"host":"springboot"},"weight":100},{"destination":{"host":"springboot-canary"},"weight":0}]}]}}
     creationTimestamp: "2026-08-02T14:34:59Z"
     generation: 1
     name: springboot
@@ -40,7 +40,7 @@ items:
     gateways:
     - springboot-gateway
     hosts:
-    - springboot.dev.learnsystems.co
+    - springboot.floci.bright.zorbos.com
     http:
     - name: primary
       route:

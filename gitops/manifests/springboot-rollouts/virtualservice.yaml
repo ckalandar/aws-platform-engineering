@@ -10,7 +10,7 @@ spec:
     - springboot-gateway
 
   hosts:
-    - springboot.dev.learnsystems.co
+    - springboot.floci.bright.zorbos.com
 
   http:
 

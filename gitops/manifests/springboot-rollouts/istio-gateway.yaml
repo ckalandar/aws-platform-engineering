@@ -16,4 +16,4 @@ spec:
         protocol: HTTP
 
       hosts:
-        - springboot.dev.learnsystems.co
+        - springboot.floci.bright.zorbos.com

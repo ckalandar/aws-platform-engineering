@@ -15,7 +15,7 @@ grafana:
       alb.ingress.kubernetes.io/target-type: ip
 
     hosts:
-      - grafana.dev.learnsystems.co
+      - grafana.floci.bright.zorbos.com
 
   sidecar:
 
