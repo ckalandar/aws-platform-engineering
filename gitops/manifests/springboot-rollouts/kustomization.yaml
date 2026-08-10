@@ -11,3 +11,4 @@ resources:
   - hpa.yaml
   - istio-gateway.yaml
   - virtualservice.yaml
+  - destinationrule.yaml
