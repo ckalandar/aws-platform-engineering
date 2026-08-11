@@ -29,7 +29,7 @@ spec:
 
         - name: springboot
 
-          image: localhost:5100/platform-demo:floci-dev
+          image: host.docker.internal:5100/platform-demo:floci-dev
 
           imagePullPolicy: Always
 

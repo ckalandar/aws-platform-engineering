@@ -56,7 +56,7 @@ provider "aws" {
     iam        = var.localstack_endpoint
     route53    = var.localstack_endpoint
     s3         = var.localstack_endpoint
-    s3control  = var.localstack_endpoint
+    s3control  = "http://s3-control.localhost.localstack.cloud:4566"
     sts        = var.localstack_endpoint
   }
 }
