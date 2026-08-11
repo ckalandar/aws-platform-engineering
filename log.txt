@@ -266,3 +266,55 @@ TL;DR — Start here:
 4. Port-forward Prometheus on :9090 → metrics
 
 The ALB ingress setup won't work on this K3s dev cluster — it's designed for EKS. If you want DNS-based access, you could switch those ingresses to use the Istio Gateway instead (which works fine, since the Istio ingress gateway is running).
+
+
+====
+
+---
+🔧 Access Commands for This Environment
+
+# ArgoCD UI
+kubectl port-forward svc/argocd-server -n argocd 8080:80
+# Then open: http://localhost:8080
+
+# Grafana (when kube-prometheus-stack is deployed)
+kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
+# Then open: http://localhost:3000
+
+# Prometheus (when deployed)
+kubectl port-forward svc/kube-prometheus-stack-prometheus -n monitoring 9090:9090
+# Then open: http://localhost:9090
+
+# [PERSON NAME] / Loki (via alloy)
+kubectl port-forward svc/alloy -n alloy 12345:12345
+# Then open: http://localhost:12345
+
+# Springboot app (when deployed)
+kubectl port-forward svc/springboot -n demo 8081:8080
+# Then open: http://localhost:8081
+
+# Nginx (already running)
+kubectl port-forward svc/nginx -n demo 8090:80
+# Then open: http://localhost:8090
+
+# Tempo (when deployed)
+kubectl port-forward svc/tempo -n monitoring 3200:3200
+# Then open: http://localhost:3200
+
+# Istio ingress gateway
+kubectl port-forward svc/istio-ingressgateway -n istio-system 8088:80
+
+---
+🔍 Future Discovery Command
+
+To find all accessible services next time, run:
+
+# List all service endpoints across the cluster
+kubectl get svc -A | grep -v ClusterIP
+
+# Or get a complete port-forward reference
+for ns in $(kubectl get ns -o name | cut -d/ -f2); do
+  kubectl get svc -n "$ns" -o custom-columns=NAMESPACE:.metadata.name,NAME:.metadata.name,TYPE:.spec.type,CLUSTER-IP:.spec.clusterIP,PORTS:.spec.ports[*].port 2>/dev/null
+done
+
+---

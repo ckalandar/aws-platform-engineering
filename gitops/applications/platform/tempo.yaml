@@ -14,7 +14,7 @@ spec:
 
   sources:
 
-    - repoURL: oci://ghcr.io/grafana/helm-charts
+    - repoURL: oci://ghcr.io/grafana/helm-charts/tempo
       chart: tempo
       targetRevision: 1.23.2
 

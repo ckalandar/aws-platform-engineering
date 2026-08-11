@@ -14,7 +14,7 @@ spec:
 
   sources:
 
-    - repoURL: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts
+    - repoURL: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts/opentelemetry-collector
       chart: opentelemetry-collector
       targetRevision: 0.128.0
 

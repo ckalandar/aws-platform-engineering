@@ -17,7 +17,7 @@ spec:
 
   sources:
 
-    - repoURL: oci://ghcr.io/prometheus-community/charts
+    - repoURL: oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
       chart: kube-prometheus-stack
       targetRevision: 78.0.0
 
