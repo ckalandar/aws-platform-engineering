@@ -1,0 +1,85 @@
+# K3s containerd registry configuration for the floci local EKS emulation.
+# Mount this at /etc/rancher/k3s/registries.yaml inside the k3s server container.
+#
+# This file maps ECR-style hostnames and the local fallback registries so that
+# the k3s containerd pulls all images from the local floci-ecr-registry over
+# plain HTTP (no TLS).
+#
+# In the create-floci-cluster.sh script these are placed on a user-defined
+# Docker network ("floci-net") where container-name DNS resolves, so endpoint
+# hostnames like "floci-ecr-registry:5000" are reachable.
+---
+mirrors:
+  # Every AWS ECR regional endpoint → local registry (plain HTTP)
+  "000000000000.dkr.ecr.us-east-1.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.us-east-2.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.us-west-1.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.us-west-2.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.eu-west-1.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.eu-west-2.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.eu-west-3.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.eu-central-1.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.ap-northeast-1.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.ap-northeast-2.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.ap-southeast-1.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.ap-southeast-2.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.ap-south-1.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.sa-east-1.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+  "000000000000.dkr.ecr.ca-central-1.localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+
+  # localhost:5100 and host.docker.internal:5100 → same local registry
+  # Pulls via host.docker.internal:5100 use plain HTTP direct to the registry,
+  # while localhost:5100 resolves via the floci-net network.
+  "host.docker.internal:5100":
+    endpoint:
+      - "http://host.docker.internal:5100"
+  "localhost:5100":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+
+  # Also catch any direct localhost:5000 references
+  "localhost:5000":
+    endpoint:
+      - "http://floci-ecr-registry:5000"
+
+# Skip TLS for all entries above — these are plain HTTP registries
+configs:
+  "host.docker.internal:5100":
+    tls:
+      insecure_skip_verify: true
+  "localhost:5100":
+    tls:
+      insecure_skip_verify: true
+  "localhost:5000":
+    tls:
+      insecure_skip_verify: true

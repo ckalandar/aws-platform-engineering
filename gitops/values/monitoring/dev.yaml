@@ -79,6 +79,13 @@ prometheus:
             requests:
               storage: 20Gi
 
+# Override node-exporter mount propagation to fix "not a shared or slave mount"
+# error on k3s/Docker Desktop (root filesystem isn't a shared mount).
+# HostToContainer propagation fails on nested container runtimes (k3s-in-Docker).
+prometheus-node-exporter:
+  hostPathRootfs: true
+  hostMountPropagation: None
+
 alertmanager:
 
   alertmanagerSpec:
