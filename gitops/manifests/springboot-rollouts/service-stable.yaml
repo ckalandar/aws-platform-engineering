@@ -4,6 +4,8 @@ kind: Service
 metadata:
   name: springboot
   namespace: springboot
+  labels:
+    app: springboot
 
 spec:
 

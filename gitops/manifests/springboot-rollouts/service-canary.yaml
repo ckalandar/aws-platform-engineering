@@ -4,6 +4,8 @@ kind: Service
 metadata:
   name: springboot-canary
   namespace: springboot
+  labels:
+    app: springboot
 
 spec:
 
