@@ -20,10 +20,16 @@ spec:
 
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: kube-system
+                kubernetes.io/metadata.name: kube-system
 
     - from:
 
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: springboot
+                kubernetes.io/metadata.name: springboot
+
+    - from:
+
+        - namespaceSelector:
+            matchLabels:
+                kubernetes.io/metadata.name: monitoring
