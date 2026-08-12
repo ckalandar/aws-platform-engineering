@@ -107,6 +107,34 @@ for i in $(seq 1 30); do
   sleep 3
 done
 
+# ── Ensure registries.yaml is present ────────────────────────────────────
+# Docker Desktop on macOS often doesn't propagate file bind mounts into the
+# container reliably.  As a workaround we always copy the file with docker cp
+# and restart k3s to pick it up, so the HTTP registry mirrors are guaranteed.
+echo "ℹ️  Copying registries.yaml into container and restarting k3s..."
+docker cp "${REGISTRIES_FILE}" "${CLUSTER_NAME}:/etc/rancher/k3s/registries.yaml" 2>/dev/null || true
+docker restart "${CLUSTER_NAME}" 2>/dev/null || true
+
+# ── Wait for node Ready (after restart) ──────────────────────────────────
+echo "⏳ Waiting for node to be Ready after restart..."
+K3S_KUBECONFIG=$(mktemp)
+trap 'rm -f "${K3S_KUBECONFIG}"' EXIT
+for i in $(seq 1 30); do
+  docker cp "${CLUSTER_NAME}:/etc/rancher/k3s/k3s.yaml" "${K3S_KUBECONFIG}" 2>/dev/null || true
+  sed -i '' "s/127.0.0.1/localhost/g; s/6443/${K3S_PORT}/g" "${K3S_KUBECONFIG}" 2>/dev/null || true
+  export KUBECONFIG="${K3S_KUBECONFIG}"
+  if kubectl get nodes -o wide 2>/dev/null | grep -q "Ready"; then
+    echo "✅ Node is Ready!"
+    break
+  fi
+  echo "   ... waiting ($i/30)"
+  sleep 3
+done
+
+# ── Verify registries.yaml inside the container ──────────────────────────
+echo "ℹ️  Verifying registries.yaml inside container..."
+docker exec "${CLUSTER_NAME}" grep -q "host.docker.internal" /etc/rancher/k3s/registries.yaml &&   echo "✅ host.docker.internal:5100 mirror present in registries.yaml" ||   echo "⚠️  host.docker.internal:5100 NOT found — check ${REGISTRIES_FILE}"
+
 echo "✅ Cluster created."
 echo
 echo "Export the kubeconfig:"
